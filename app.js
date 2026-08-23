@@ -1,76 +1,103 @@
 // ============================================================
 // FLIP 7 SCORER
-// Game logic
+// Game Logic
 // ============================================================
 
 
-// ------------------------------------------------------------
+// ============================================================
 // GAME STATE
-// ------------------------------------------------------------
+// ============================================================
 
 const game = {
 
     players: [],
 
-    currentPlayer: 0,
-
     round: 1,
 
-    selectedCards: [],
+    activePlayer: 0,
 
-    selectedModifiers: [],
-
-    hasDouble: false,
+    // Each player has an entry for the current round.
+    // These scores are NOT permanent until SAVE ROUND.
+    entries: [],
 
     history: []
 
 };
 
 
-// ------------------------------------------------------------
-// INITIAL SCREEN
-// ------------------------------------------------------------
+// ============================================================
+// EMPTY ROUND ENTRY
+// ============================================================
+
+function emptyEntry() {
+
+    return {
+
+        cards: [],
+
+        modifiers: [],
+
+        double: false,
+
+        bust: false,
+
+        saved: false
+
+    };
+
+}
+
+
+// ============================================================
+// PLAYER SETUP
+// ============================================================
 
 function showSetup() {
 
     document.getElementById("app").innerHTML = `
 
-        <div class="app-container">
+        <div class="app">
 
-            <header class="app-header">
+            <header>
 
                 <div>
 
                     <h1>Flip 7</h1>
 
-                    <p>Scoring Companion</p>
+                    <div class="sub">
+                        Scoring companion
+                    </div>
 
                 </div>
 
             </header>
 
 
-            <main class="setup-card">
+            <section class="panel">
 
                 <h2>Who's playing?</h2>
 
-                <p class="instruction">
-                    Add 3–9 players to begin.
+                <p class="sub">
+                    Add 3–9 players.
                 </p>
 
 
-                <div class="player-input">
+                <div
+                    class="row"
+                    style="margin-top:14px"
+                >
 
                     <input
-                        id="playerName"
-                        type="text"
+                        id="nameInput"
+                        class="input"
                         placeholder="Player name"
                         autocomplete="off"
                     >
 
+
                     <button
-                        class="button primary"
-                        onclick="addPlayer()"
+                        class="btn primary"
+                        id="addBtn"
                     >
                         Add Player
                     </button>
@@ -78,19 +105,21 @@ function showSetup() {
                 </div>
 
 
-                <div id="playerList"></div>
+                <div
+                    id="playerList"
+                    class="player-list"
+                ></div>
 
 
                 <button
-                    id="startButton"
-                    class="button primary full-width"
-                    onclick="startGame()"
+                    class="btn primary full"
+                    id="startBtn"
                     disabled
                 >
                     Start Game
                 </button>
 
-            </main>
+            </section>
 
         </div>
 
@@ -98,31 +127,51 @@ function showSetup() {
 
 
     document
-        .getElementById("playerName")
-        .addEventListener("keydown", function(event) {
+        .getElementById("addBtn")
+        .addEventListener(
+            "click",
+            addPlayer
+        );
 
-            if (event.key === "Enter") {
 
-                addPlayer();
+    document
+        .getElementById("nameInput")
+        .addEventListener(
+            "keydown",
+            function(event) {
+
+                if (event.key === "Enter") {
+
+                    addPlayer();
+
+                }
 
             }
+        );
 
-        });
+
+    document
+        .getElementById("startBtn")
+        .addEventListener(
+            "click",
+            startGame
+        );
 
 
-    renderPlayerList();
+    renderSetup();
 
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // ADD PLAYER
-// ------------------------------------------------------------
+// ============================================================
 
 function addPlayer() {
 
     const input =
-        document.getElementById("playerName");
+        document.getElementById("nameInput");
+
 
     const name =
         input.value.trim();
@@ -146,7 +195,7 @@ function addPlayer() {
 
         name: name,
 
-        score: 0
+        total: 0
 
     });
 
@@ -154,19 +203,20 @@ function addPlayer() {
     input.value = "";
 
 
-    renderPlayerList();
+    renderSetup();
 
 }
 
 
-// ------------------------------------------------------------
-// PLAYER LIST
-// ------------------------------------------------------------
+// ============================================================
+// PLAYER SETUP DISPLAY
+// ============================================================
 
-function renderPlayerList() {
+function renderSetup() {
 
     const list =
         document.getElementById("playerList");
+
 
     if (!list) {
 
@@ -175,65 +225,74 @@ function renderPlayerList() {
     }
 
 
-    list.innerHTML = game.players
-        .map(function(player, index) {
+    list.innerHTML =
+        game.players
+            .map(
+                function(player, index) {
 
-            return `
+                    return `
 
-                <div class="player-row">
+                        <div class="player-row">
 
-                    <span>
+                            <span>
 
-                        ${index + 1}.
-                        ${escapeHTML(player.name)}
+                                ${index + 1}.
+                                ${escapeHTML(player.name)}
 
-                    </span>
-
-                    <button
-                        class="remove-button"
-                        onclick="removePlayer(${index})"
-                    >
-                        ×
-                    </button>
-
-                </div>
-
-            `;
-
-        })
-        .join("");
+                            </span>
 
 
-    const startButton =
-        document.getElementById("startButton");
+                            <button
+                                class="x"
+                                data-remove="${index}"
+                            >
+                                ×
+                            </button>
+
+                        </div>
+
+                    `;
+
+                }
+            )
+            .join("");
 
 
-    if (startButton) {
+    list
+        .querySelectorAll("[data-remove]")
+        .forEach(
+            function(button) {
 
-        startButton.disabled =
+                button.addEventListener(
+                    "click",
+                    function() {
+
+                        game.players.splice(
+                            Number(button.dataset.remove),
+                            1
+                        );
+
+
+                        renderSetup();
+
+                    }
+                );
+
+            }
+        );
+
+
+    document
+        .getElementById("startBtn")
+        .disabled =
             game.players.length < 3;
 
-    }
-
 }
 
 
-// ------------------------------------------------------------
-// REMOVE PLAYER
-// ------------------------------------------------------------
-
-function removePlayer(index) {
-
-    game.players.splice(index, 1);
-
-    renderPlayerList();
-
-}
-
-
-// ------------------------------------------------------------
+// ============================================================
 // START GAME
-// ------------------------------------------------------------
+// ============================================================
 
 function startGame() {
 
@@ -244,42 +303,77 @@ function startGame() {
     }
 
 
+    // Create a blank round entry
+    // for every player.
+
+    game.entries =
+        game.players.map(
+            function() {
+
+                return emptyEntry();
+
+            }
+        );
+
+
     renderGame();
 
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
+// CURRENT PLAYER ENTRY
+// ============================================================
+
+function currentEntry() {
+
+    return game.entries[
+        game.activePlayer
+    ];
+
+}
+
+
+// ============================================================
 // MAIN GAME SCREEN
-// ------------------------------------------------------------
+// ============================================================
 
 function renderGame() {
 
     const player =
-        game.players[game.currentPlayer];
+        game.players[
+            game.activePlayer
+        ];
 
 
     document.getElementById("app").innerHTML = `
 
-        <div class="app-container">
+        <div class="app">
 
 
-            <header class="game-header">
+            <!-- HEADER -->
+
+            <header>
 
                 <div>
 
                     <h1>Flip 7</h1>
 
-                    <p>
+                    <div class="sub">
+
                         Round ${game.round}
-                    </p>
+
+                        • Nothing is final
+                        until you save the round
+
+                    </div>
 
                 </div>
 
 
                 <button
-                    class="button secondary"
-                    onclick="newGame()"
+                    class="btn secondary"
+                    id="newGame"
                 >
                     New Game
                 </button>
@@ -289,37 +383,104 @@ function renderGame() {
 
             <!-- SCOREBOARD -->
 
-            <section class="scoreboard">
+            <section class="panel">
 
-                ${renderScoreboard()}
-
-            </section>
-
-
-            <!-- CURRENT PLAYER -->
-
-            <section class="game-panel">
-
-                <div class="section-heading">
+                <div class="turn">
 
                     <div>
 
                         <h2>
-                            ${escapeHTML(player.name)}
+                            Round ${game.round}
                         </h2>
 
                         <p>
-                            Select the cards they kept.
+                            Tap any player's tile
+                            to enter or review them.
                         </p>
 
                     </div>
+
+
+                    <strong>
+
+                        ${
+                            game.entries.filter(
+                                function(entry) {
+
+                                    return entry.saved;
+
+                                }
+                            ).length
+
+                        }
+
+                        /
+
+                        ${game.players.length}
+
+                        ready
+
+                    </strong>
+
+                </div>
+
+
+                <div
+                    class="scoreboard"
+                    style="margin-top:15px"
+                >
+
+                    ${renderScoreboard()}
+
+                </div>
+
+            </section>
+
+
+            <!-- PLAYER ENTRY -->
+
+            <section
+                class="panel"
+                style="margin-top:16px"
+            >
+
+                <div class="turn">
+
+                    <div>
+
+                        <h2>
+
+                            ${escapeHTML(
+                                player.name
+                            )}
+
+                        </h2>
+
+                        <p>
+                            Enter this player's cards.
+                        </p>
+
+                    </div>
+
+
+                    <strong>
+
+                        Player
+                        ${game.activePlayer + 1}
+                        of
+                        ${game.players.length}
+
+                    </strong>
 
                 </div>
 
 
                 <!-- NUMBER CARDS -->
 
-                <h3>Number Cards</h3>
+                <h3>
+                    Number Cards
+                </h3>
+
 
                 <div class="card-grid">
 
@@ -330,32 +491,38 @@ function renderGame() {
 
                 <!-- SPECIAL CARDS -->
 
-                <h3 class="section-space">
+                <h3>
                     Special Cards
                 </h3>
 
 
-                <div class="modifier-grid">
+                <div class="mod-grid">
 
-                    ${renderModifierButton(2)}
+                    ${renderModifier(2)}
 
-                    ${renderModifierButton(4)}
+                    ${renderModifier(4)}
 
-                    ${renderModifierButton(6)}
+                    ${renderModifier(6)}
 
-                    ${renderModifierButton(8)}
+                    ${renderModifier(8)}
 
-                    ${renderModifierButton(10)}
+                    ${renderModifier(10)}
 
 
                     <button
                         class="
-                            modifier-button
-                            ${game.hasDouble ? "selected" : ""}
+                            mod
+                            ${
+                                currentEntry().double
+                                    ? "selected"
+                                    : ""
+                            }
                         "
-                        onclick="toggleDouble()"
+                        id="doubleButton"
                     >
+
                         ×2
+
                     </button>
 
                 </div>
@@ -363,63 +530,108 @@ function renderGame() {
 
                 <!-- SCORE PREVIEW -->
 
-                <div class="score-preview">
+                <div class="preview">
 
-                    <div class="score-label">
-                        Current Round
+                    <div class="preview-label">
+
+                        ROUND SCORE
+
                     </div>
 
 
-                    <div class="round-score">
+                    <div class="score">
 
                         ${calculateScore()}
 
                     </div>
 
 
-                    <div class="score-breakdown">
+                    <div class="breakdown">
 
-                        ${getScoreBreakdown()}
+                        ${getBreakdown()}
 
                     </div>
 
 
-                    <div
-                        id="gameStatus"
-                        class="game-status"
+                    <div class="status">
+
+                        ${getStatus()}
+
+                    </div>
+
+
+                    <div class="actions">
+
+                        <button
+                            class="btn primary"
+                            id="savePlayer"
+                        >
+
+                            ${
+                                currentEntry().saved
+                                    ? "Update Player"
+                                    : "Save Player"
+                            }
+
+                        </button>
+
+
+                        <button
+                            class="btn secondary"
+                            id="bustButton"
+                        >
+
+                            Bust
+
+                        </button>
+
+
+                        <button
+                            class="btn secondary"
+                            id="clearPlayer"
+                        >
+
+                            Clear Player
+
+                        </button>
+
+                    </div>
+
+                </div>
+
+
+                <!-- ROUND CONTROLS -->
+
+                <div class="round-actions">
+
+                    <button
+                        class="btn primary"
+                        id="saveRound"
+                        ${
+                            allPlayersReady()
+                                ? ""
+                                : "disabled"
+                        }
                     >
 
-                        ${getStatusMessage()}
+                        SAVE ROUND
 
-                    </div>
-
-
-                    <div class="action-buttons">
-
-                        <button
-                            class="button primary"
-                            onclick="saveScore()"
-                        >
-                            Save Score
-                        </button>
+                    </button>
 
 
-                        <button
-                            class="button secondary"
-                            onclick="bustPlayer()"
-                        >
-                            Bust
-                        </button>
+                    <button
+                        class="btn danger"
+                        id="clearRound"
+                        ${
+                            hasPendingEntries()
+                                ? ""
+                                : "disabled"
+                        }
+                    >
 
+                        CLEAR CURRENT ROUND
 
-                        <button
-                            class="button secondary"
-                            onclick="clearSelection()"
-                        >
-                            Clear
-                        </button>
-
-                    </div>
+                    </button>
 
                 </div>
 
@@ -428,9 +640,14 @@ function renderGame() {
 
             <!-- HISTORY -->
 
-            <section class="game-panel history-panel">
+            <section
+                class="panel history"
+            >
 
-                <h2>Round History</h2>
+                <h2>
+                    Round History
+                </h2>
+
 
                 ${renderHistory()}
 
@@ -441,117 +658,329 @@ function renderGame() {
 
     `;
 
+
+    connectGameButtons();
+
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
+// CONNECT GAME BUTTONS
+// ============================================================
+
+function connectGameButtons() {
+
+    document
+        .getElementById("newGame")
+        .addEventListener(
+            "click",
+            function() {
+
+                location.reload();
+
+            }
+        );
+
+
+    document
+        .querySelectorAll("[data-player]")
+        .forEach(
+            function(button) {
+
+                button.addEventListener(
+                    "click",
+                    function() {
+
+                        game.activePlayer =
+                            Number(
+                                button.dataset.player
+                            );
+
+
+                        renderGame();
+
+                    }
+                );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll("[data-card]")
+        .forEach(
+            function(button) {
+
+                button.addEventListener(
+                    "click",
+                    function() {
+
+                        toggleCard(
+                            Number(
+                                button.dataset.card
+                            )
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll("[data-modifier]")
+        .forEach(
+            function(button) {
+
+                button.addEventListener(
+                    "click",
+                    function() {
+
+                        toggleModifier(
+                            Number(
+                                button.dataset.modifier
+                            )
+                        );
+
+                    }
+                );
+
+            }
+        );
+
+
+    document
+        .getElementById("doubleButton")
+        .addEventListener(
+            "click",
+            toggleDouble
+        );
+
+
+    document
+        .getElementById("savePlayer")
+        .addEventListener(
+            "click",
+            savePlayerEntry
+        );
+
+
+    document
+        .getElementById("bustButton")
+        .addEventListener(
+            "click",
+            bustPlayer
+        );
+
+
+    document
+        .getElementById("clearPlayer")
+        .addEventListener(
+            "click",
+            clearPlayer
+        );
+
+
+    document
+        .getElementById("saveRound")
+        .addEventListener(
+            "click",
+            saveRound
+        );
+
+
+    document
+        .getElementById("clearRound")
+        .addEventListener(
+            "click",
+            clearCurrentRound
+        );
+
+}
+
+
+// ============================================================
 // SCOREBOARD
-// ------------------------------------------------------------
+// ============================================================
 
 function renderScoreboard() {
 
     return game.players
-        .map(function(player, index) {
+        .map(
+            function(player, index) {
 
-            const active =
-                index === game.currentPlayer;
-
-
-            return `
-
-                <div
-                    class="
-                        player-card
-                        ${active ? "active" : ""}
-                    "
-                >
-
-                    <div class="player-card-name">
-
-                        ${escapeHTML(player.name)}
-
-                    </div>
+                const entry =
+                    game.entries[index];
 
 
-                    <div class="player-card-score">
+                return `
 
-                        ${player.score}
+                    <button
+                        class="
+                            player-tile
+                            ${
+                                index ===
+                                game.activePlayer
+                                    ? "active"
+                                    : ""
+                            }
 
-                    </div>
+                            ${
+                                entry.saved
+                                    ? "pending"
+                                    : ""
+                            }
+                        "
+
+                        data-player="${index}"
+                    >
+
+                        <div class="name">
+
+                            ${escapeHTML(
+                                player.name
+                            )}
+
+                        </div>
 
 
-                    <div class="player-card-label">
+                        <div class="total">
 
-                        ${active ? "Current turn" : "Score"}
+                            ${player.total}
 
-                    </div>
+                        </div>
 
-                </div>
 
-            `;
+                        ${
+                            entry.saved
 
-        })
+                                ? `
+
+                                    <div
+                                        class="
+                                            pending-score
+                                        "
+                                    >
+
+                                        Round:
+
+                                        ${
+                                            entry.bust
+                                                ? "BUST"
+                                                : calculateScore(
+                                                    entry
+                                                )
+                                        }
+
+                                    </div>
+
+                                `
+
+                                : `
+
+                                    <div
+                                        class="
+                                            tile-label
+                                        "
+                                    >
+
+                                        Not entered
+
+                                    </div>
+
+                                `
+                        }
+
+                    </button>
+
+                `;
+
+            }
+        )
         .join("");
 
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // NUMBER CARDS
-// ------------------------------------------------------------
+// ============================================================
 
 function renderNumberCards() {
 
-    return Array.from(
-        { length: 12 },
-        function(_, index) {
-
-            const number = index + 1;
-
-            const selected =
-                game.selectedCards.includes(number);
+    const entry =
+        currentEntry();
 
 
-            return `
+    return Array
+        .from(
+            { length: 12 },
+            function(_, index) {
 
-                <button
-                    class="
-                        number-card
-                        ${selected ? "selected" : ""}
-                    "
-                    onclick="toggleCard(${number})"
-                >
+                const number =
+                    index + 1;
 
-                    ${number}
 
-                </button>
+                const selected =
+                    entry.cards.includes(
+                        number
+                    );
 
-            `;
 
-        }
-    ).join("");
+                return `
+
+                    <button
+                        class="
+                            number
+                            ${
+                                selected
+                                    ? "selected"
+                                    : ""
+                            }
+                        "
+
+                        data-card="${number}"
+                    >
+
+                        ${number}
+
+                    </button>
+
+                `;
+
+            }
+        )
+        .join("");
 
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // MODIFIER BUTTON
-// ------------------------------------------------------------
+// ============================================================
 
-function renderModifierButton(value) {
+function renderModifier(value) {
 
     const selected =
-        game.selectedModifiers.includes(value);
+        currentEntry()
+            .modifiers
+            .includes(value);
 
 
     return `
 
         <button
             class="
-                modifier-button
-                ${selected ? "selected" : ""}
+                mod
+                ${
+                    selected
+                        ? "selected"
+                        : ""
+                }
             "
-            onclick="toggleModifier(${value})"
+
+            data-modifier="${value}"
         >
 
             +${value}
@@ -563,18 +992,27 @@ function renderModifierButton(value) {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // SELECT NUMBER CARD
-// ------------------------------------------------------------
+// ============================================================
 
 function toggleCard(number) {
 
+    const entry =
+        currentEntry();
+
+
+    entry.bust = false;
+
+    entry.saved = false;
+
+
     if (
-        game.selectedCards.includes(number)
+        entry.cards.includes(number)
     ) {
 
-        game.selectedCards =
-            game.selectedCards.filter(
+        entry.cards =
+            entry.cards.filter(
                 function(card) {
 
                     return card !== number;
@@ -584,7 +1022,7 @@ function toggleCard(number) {
 
     } else {
 
-        game.selectedCards.push(number);
+        entry.cards.push(number);
 
     }
 
@@ -594,18 +1032,27 @@ function toggleCard(number) {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // SELECT MODIFIER
-// ------------------------------------------------------------
+// ============================================================
 
 function toggleModifier(value) {
 
+    const entry =
+        currentEntry();
+
+
+    entry.bust = false;
+
+    entry.saved = false;
+
+
     if (
-        game.selectedModifiers.includes(value)
+        entry.modifiers.includes(value)
     ) {
 
-        game.selectedModifiers =
-            game.selectedModifiers.filter(
+        entry.modifiers =
+            entry.modifiers.filter(
                 function(modifier) {
 
                     return modifier !== value;
@@ -615,7 +1062,7 @@ function toggleModifier(value) {
 
     } else {
 
-        game.selectedModifiers.push(value);
+        entry.modifiers.push(value);
 
     }
 
@@ -625,14 +1072,23 @@ function toggleModifier(value) {
 }
 
 
-// ------------------------------------------------------------
-// DOUBLE
-// ------------------------------------------------------------
+// ============================================================
+// ×2
+// ============================================================
 
 function toggleDouble() {
 
-    game.hasDouble =
-        !game.hasDouble;
+    const entry =
+        currentEntry();
+
+
+    entry.bust = false;
+
+    entry.saved = false;
+
+
+    entry.double =
+        !entry.double;
 
 
     renderGame();
@@ -640,14 +1096,21 @@ function toggleDouble() {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // CALCULATE SCORE
-// ------------------------------------------------------------
+// ============================================================
 
-function calculateScore() {
+function calculateScore(entry = currentEntry()) {
+
+    if (entry.bust) {
+
+        return 0;
+
+    }
+
 
     const base =
-        game.selectedCards.reduce(
+        entry.cards.reduce(
             function(total, card) {
 
                 return total + card;
@@ -657,12 +1120,8 @@ function calculateScore() {
         );
 
 
-    const multiplier =
-        game.hasDouble ? 2 : 1;
-
-
     const modifiers =
-        game.selectedModifiers.reduce(
+        entry.modifiers.reduce(
             function(total, modifier) {
 
                 return total + modifier;
@@ -672,8 +1131,14 @@ function calculateScore() {
         );
 
 
+    const multiplier =
+        entry.double
+            ? 2
+            : 1;
+
+
     const flipSeven =
-        game.selectedCards.length === 7
+        entry.cards.length === 7
             ? 15
             : 0;
 
@@ -687,14 +1152,25 @@ function calculateScore() {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // SCORE BREAKDOWN
-// ------------------------------------------------------------
+// ============================================================
 
-function getScoreBreakdown() {
+function getBreakdown() {
+
+    const entry =
+        currentEntry();
+
+
+    if (entry.bust) {
+
+        return "Bust = 0 points";
+
+    }
+
 
     const base =
-        game.selectedCards.reduce(
+        entry.cards.reduce(
             function(total, card) {
 
                 return total + card;
@@ -708,25 +1184,28 @@ function getScoreBreakdown() {
         `Cards: ${base}`;
 
 
-    if (game.hasDouble) {
+    if (entry.double) {
 
         text += " × 2";
 
     }
 
 
-    if (game.selectedModifiers.length) {
+    if (entry.modifiers.length) {
 
         text +=
             " + " +
-            game.selectedModifiers.join(" + ");
+            entry.modifiers.join(" + ");
 
     }
 
 
-    if (game.selectedCards.length === 7) {
+    if (
+        entry.cards.length === 7
+    ) {
 
-        text += " + 15 Flip 7";
+        text +=
+            " + 15 Flip 7";
 
     }
 
@@ -736,146 +1215,284 @@ function getScoreBreakdown() {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // STATUS
-// ------------------------------------------------------------
+// ============================================================
 
-function getStatusMessage() {
+function getStatus() {
 
-    if (game.selectedCards.length === 7) {
+    const entry =
+        currentEntry();
+
+
+    if (entry.bust) {
 
         return `
-            <span class="success">
-                FLIP 7! +15 bonus
+            <span class="bad">
+
+                BUST — 0 points
+
             </span>
         `;
 
     }
 
 
-    if (game.selectedCards.length === 0) {
+    if (
+        entry.cards.length === 7
+    ) {
 
-        return "Select cards to calculate the score.";
+        return `
+            <span class="good">
+
+                FLIP 7 — +15 bonus
+
+            </span>
+        `;
+
+    }
+
+
+    if (
+        entry.cards.length === 0
+    ) {
+
+        return "No cards entered yet.";
 
     }
 
 
     return `
-        ${game.selectedCards.length}
-        card${game.selectedCards.length === 1 ? "" : "s"}
-        selected
+
+        ${entry.cards.length}
+
+        card${entry.cards.length === 1
+            ? ""
+            : "s"}
+
+        entered.
+
     `;
 
 }
 
 
-// ------------------------------------------------------------
-// SAVE SCORE
-// ------------------------------------------------------------
+// ============================================================
+// SAVE INDIVIDUAL PLAYER ENTRY
+// ============================================================
 
-function saveScore() {
+function savePlayerEntry() {
 
-    const score =
-        calculateScore();
-
-
-    const player =
-        game.players[game.currentPlayer];
+    const entry =
+        currentEntry();
 
 
-    player.score += score;
+    entry.bust = false;
+
+    entry.saved = true;
 
 
-    game.history.push({
-
-        round: game.round,
-
-        player: player.name,
-
-        score: score,
-
-        bust: false
-
-    });
-
-
-    nextPlayer();
+    renderGame();
 
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // BUST
-// ------------------------------------------------------------
+// ============================================================
 
 function bustPlayer() {
 
-    const player =
-        game.players[game.currentPlayer];
+    const entry =
+        currentEntry();
 
 
-    game.history.push({
+    entry.cards = [];
 
-        round: game.round,
+    entry.modifiers = [];
 
-        player: player.name,
+    entry.double = false;
 
-        score: 0,
+    entry.bust = true;
 
-        bust: true
-
-    });
+    entry.saved = true;
 
 
-    nextPlayer();
+    renderGame();
 
 }
 
 
-// ------------------------------------------------------------
-// NEXT PLAYER
-// ------------------------------------------------------------
+// ============================================================
+// CLEAR ONE PLAYER
+// ============================================================
 
-function nextPlayer() {
+function clearPlayer() {
 
-    game.selectedCards = [];
-
-    game.selectedModifiers = [];
-
-    game.hasDouble = false;
+    game.entries[
+        game.activePlayer
+    ] = emptyEntry();
 
 
-    game.currentPlayer++;
+    renderGame();
+
+}
 
 
-    if (
-        game.currentPlayer >=
+// ============================================================
+// ARE ALL PLAYERS READY?
+// ============================================================
+
+function allPlayersReady() {
+
+    return game.entries.length ===
         game.players.length
-    ) {
 
-        game.currentPlayer = 0;
+        &&
 
-        game.round++;
+        game.entries.every(
+            function(entry) {
+
+                return entry.saved;
+
+            }
+        );
+
+}
+
+
+// ============================================================
+// DOES CURRENT ROUND HAVE ANY ENTRIES?
+// ============================================================
+
+function hasPendingEntries() {
+
+    return game.entries.some(
+        function(entry) {
+
+            return entry.saved;
+
+        }
+    );
+
+}
+
+
+// ============================================================
+// SAVE ENTIRE ROUND
+// ============================================================
+
+function saveRound() {
+
+    if (!allPlayersReady()) {
+
+        return;
 
     }
 
 
+    // Permanently add this round
+    // to every player's total.
+
+    game.players.forEach(
+        function(player, index) {
+
+            player.total +=
+                calculateScore(
+                    game.entries[index]
+                );
+
+        }
+    );
+
+
+    // Save a permanent copy
+    // of this round's results.
+
+    game.history.push({
+
+        round: game.round,
+
+        scores:
+            game.entries.map(
+                function(entry, index) {
+
+                    return {
+
+                        name:
+                            game.players[index]
+                                .name,
+
+                        score:
+                            calculateScore(
+                                entry
+                            ),
+
+                        bust:
+                            entry.bust
+
+                    };
+
+                }
+            )
+
+    });
+
+
+    // Start a brand-new round.
+
+    game.round++;
+
+    game.entries =
+        game.players.map(
+            function() {
+
+                return emptyEntry();
+
+            }
+        );
+
+
+    game.activePlayer = 0;
+
+
     renderGame();
 
 }
 
 
-// ------------------------------------------------------------
-// CLEAR
-// ------------------------------------------------------------
+// ============================================================
+// CLEAR CURRENT ROUND
+// ============================================================
 
-function clearSelection() {
+function clearCurrentRound() {
 
-    game.selectedCards = [];
+    if (!hasPendingEntries()) {
 
-    game.selectedModifiers = [];
+        return;
 
-    game.hasDouble = false;
+    }
+
+
+    // IMPORTANT:
+    //
+    // We have NOT added these scores
+    // to permanent totals yet.
+    //
+    // Therefore clearing the round
+    // simply throws away the entries.
+
+    game.entries =
+        game.players.map(
+            function() {
+
+                return emptyEntry();
+
+            }
+        );
+
+
+    game.activePlayer = 0;
 
 
     renderGame();
@@ -883,18 +1500,24 @@ function clearSelection() {
 }
 
 
-// ------------------------------------------------------------
+// ============================================================
 // HISTORY
-// ------------------------------------------------------------
+// ============================================================
 
 function renderHistory() {
 
-    if (!game.history.length) {
+    if (
+        game.history.length === 0
+    ) {
 
         return `
-            <p class="empty-history">
-                No rounds recorded yet.
-            </p>
+
+            <div class="empty">
+
+                No completed rounds yet.
+
+            </div>
+
         `;
 
     }
@@ -903,65 +1526,96 @@ function renderHistory() {
     return game.history
         .slice()
         .reverse()
-        .map(function(entry) {
+        .map(
+            function(round) {
 
-            return `
+                return `
 
-                <div class="history-row">
-
-                    <span>
-                        Round ${entry.round}
-                    </span>
-
-                    <strong>
-                        ${escapeHTML(entry.player)}
-                    </strong>
-
-                    <span
-                        class="
-                            ${entry.bust
-                                ? "bust"
-                                : ""
-                            }
+                    <div
+                        style="
+                            margin-bottom:12px
                         "
                     >
 
+                        <strong>
+
+                            Round
+                            ${round.round}
+
+                        </strong>
+
+
                         ${
-                            entry.bust
-                                ? "BUST"
-                                : "+" + entry.score
+                            round.scores
+                                .map(
+                                    function(result) {
+
+                                        return `
+
+                                            <div
+                                                class="
+                                                    history-row
+                                                "
+                                            >
+
+                                                <span>
+
+                                                    ${escapeHTML(
+                                                        result.name
+                                                    )}
+
+                                                </span>
+
+
+                                                <span>
+
+                                                    ${
+                                                        result.bust
+                                                            ? "BUST"
+                                                            : "Round score"
+                                                    }
+
+                                                </span>
+
+
+                                                <span>
+
+                                                    ${
+                                                        result.bust
+                                                            ? "0"
+                                                            : "+" +
+                                                              result.score
+                                                    }
+
+                                                </span>
+
+                                            </div>
+
+                                        `;
+
+                                    }
+                                )
+                                .join("")
                         }
 
-                    </span>
+                    </div>
 
-                </div>
+                `;
 
-            `;
-
-        })
+            }
+        )
         .join("");
 
 }
 
 
-// ------------------------------------------------------------
-// NEW GAME
-// ------------------------------------------------------------
-
-function newGame() {
-
-    location.reload();
-
-}
-
-
-// ------------------------------------------------------------
-// SECURITY HELPER
-// ------------------------------------------------------------
+// ============================================================
+// BASIC HTML SAFETY
+// ============================================================
 
 function escapeHTML(text) {
 
-    return text.replace(
+    return String(text).replace(
         /[&<>"']/g,
         function(character) {
 
@@ -988,8 +1642,8 @@ function escapeHTML(text) {
 }
 
 
-// ------------------------------------------------------------
-// START
-// ------------------------------------------------------------
+// ============================================================
+// START APPLICATION
+// ============================================================
 
 showSetup();
