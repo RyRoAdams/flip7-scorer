@@ -1,4 +1,4 @@
-const CACHE_NAME = "flip7-scorer-v3";
+const CACHE_NAME = "flip7-scorer-v4";
 
 const FILES_TO_CACHE = [
     "./",
