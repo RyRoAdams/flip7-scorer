@@ -24,7 +24,9 @@ const game = {
 
 function getRecentPlayers() {
     try {
-        const saved = localStorage.getItem(RECENT_PLAYERS_KEY);
+        const saved = localStorage.getItem(
+            RECENT_PLAYERS_KEY
+        );
 
         if (!saved) {
             return [];
@@ -37,16 +39,27 @@ function getRecentPlayers() {
         }
 
         return players
-            .filter(name => typeof name === "string" && name.trim())
+            .filter(
+                name =>
+                    typeof name === "string" &&
+                    name.trim()
+            )
             .map(name => name.trim())
             .filter(
                 (name, index, array) =>
                     array.findIndex(
-                        item => item.toLowerCase() === name.toLowerCase()
+                        item =>
+                            item.toLowerCase() ===
+                            name.toLowerCase()
                     ) === index
             );
+
     } catch (error) {
-        console.error("Could not load recent players:", error);
+        console.error(
+            "Could not load recent players:",
+            error
+        );
+
         return [];
     }
 }
@@ -56,17 +69,21 @@ function saveRecentPlayers(players) {
     const unique = [];
 
     players.forEach(name => {
-        const cleanName = String(name).trim();
+
+        const cleanName =
+            String(name).trim();
 
         if (
             cleanName &&
             !unique.some(
                 existing =>
-                    existing.toLowerCase() === cleanName.toLowerCase()
+                    existing.toLowerCase() ===
+                    cleanName.toLowerCase()
             )
         ) {
             unique.push(cleanName);
         }
+
     });
 
     localStorage.setItem(
@@ -77,61 +94,85 @@ function saveRecentPlayers(players) {
 
 
 function rememberPlayers(names) {
-    const existing = getRecentPlayers();
 
-    const combined = [
+    const existing =
+        getRecentPlayers();
+
+    saveRecentPlayers([
         ...names,
         ...existing
-    ];
+    ]);
 
-    saveRecentPlayers(combined);
 }
 
 
 function removeRecentPlayer(name) {
-    const remaining = getRecentPlayers().filter(
-        player =>
-            player.toLowerCase() !== name.toLowerCase()
-    );
+
+    const remaining =
+        getRecentPlayers().filter(
+            player =>
+                player.toLowerCase() !==
+                name.toLowerCase()
+        );
 
     saveRecentPlayers(remaining);
 
     renderSetup();
+
 }
 
 
 function getLastGroup() {
+
     try {
-        const saved = localStorage.getItem(LAST_GROUP_KEY);
+        const saved =
+            localStorage.getItem(
+                LAST_GROUP_KEY
+            );
 
         if (!saved) {
             return [];
         }
 
-        const group = JSON.parse(saved);
+        const group =
+            JSON.parse(saved);
 
         if (!Array.isArray(group)) {
             return [];
         }
 
         return group
-            .filter(name => typeof name === "string")
+            .filter(
+                name =>
+                    typeof name === "string"
+            )
             .map(name => name.trim())
             .filter(Boolean);
+
     } catch (error) {
-        console.error("Could not load last group:", error);
+        console.error(
+            "Could not load last group:",
+            error
+        );
+
         return [];
     }
+
 }
 
 
 function saveLastGroup() {
-    const names = game.players.map(player => player.name);
+
+    const names =
+        game.players.map(
+            player => player.name
+        );
 
     localStorage.setItem(
         LAST_GROUP_KEY,
         JSON.stringify(names)
     );
+
 }
 
 
@@ -197,21 +238,310 @@ function emptyEntry() {
 
 
 // ============================================================
+// CUSTOM APP MODALS
+// ============================================================
+
+function showModal({
+    title,
+    message = "",
+    input = false,
+    confirmText = "OK",
+    cancelText = "CANCEL",
+    onConfirm = null
+}) {
+
+    const existing =
+        document.getElementById("appModal");
+
+    if (existing) {
+        existing.remove();
+    }
+
+    const modal =
+        document.createElement("div");
+
+    modal.id = "appModal";
+
+    modal.style.position = "fixed";
+    modal.style.inset = "0";
+    modal.style.zIndex = "10000";
+    modal.style.display = "flex";
+    modal.style.alignItems = "center";
+    modal.style.justifyContent = "center";
+    modal.style.padding = "20px";
+    modal.style.background = "rgba(0,0,0,.45)";
+
+    modal.innerHTML = `
+
+        <div
+            style="
+                width:100%;
+                max-width:420px;
+                background:var(--panel,#fff);
+                color:inherit;
+                border-radius:18px;
+                padding:24px;
+                box-sizing:border-box;
+                box-shadow:0 20px 60px rgba(0,0,0,.25);
+            "
+        >
+
+            <h2
+                style="
+                    margin:0 0 10px;
+                "
+            >
+                ${escapeHTML(title)}
+            </h2>
+
+            ${
+                message
+                    ? `
+                        <p
+                            style="
+                                margin:0 0 18px;
+                            "
+                        >
+                            ${escapeHTML(message)}
+                        </p>
+                    `
+                    : ""
+            }
+
+            ${
+                input
+                    ? `
+                        <input
+                            id="modalInput"
+                            class="input"
+                            type="text"
+                            autocomplete="off"
+                            style="
+                                width:100%;
+                                box-sizing:border-box;
+                                margin-bottom:18px;
+                            "
+                        >
+                    `
+                    : ""
+            }
+
+            <div
+                style="
+                    display:flex;
+                    justify-content:flex-end;
+                    gap:10px;
+                "
+            >
+
+                <button
+                    class="btn secondary"
+                    id="modalCancel"
+                >
+                    ${escapeHTML(cancelText)}
+                </button>
+
+                <button
+                    class="btn primary"
+                    id="modalConfirm"
+                >
+                    ${escapeHTML(confirmText)}
+                </button>
+
+            </div>
+
+        </div>
+
+    `;
+
+    document.body.appendChild(modal);
+
+    const inputElement =
+        document.getElementById("modalInput");
+
+    if (inputElement) {
+        inputElement.focus();
+    }
+
+    document
+        .getElementById("modalCancel")
+        .addEventListener(
+            "click",
+            () => modal.remove()
+        );
+
+    document
+        .getElementById("modalConfirm")
+        .addEventListener(
+            "click",
+            () => {
+
+                const value =
+                    inputElement
+                        ? inputElement.value.trim()
+                        : true;
+
+                modal.remove();
+
+                if (onConfirm) {
+                    onConfirm(value);
+                }
+
+            }
+        );
+
+    if (inputElement) {
+
+        inputElement.addEventListener(
+            "keydown",
+            event => {
+
+                if (event.key === "Enter") {
+
+                    document
+                        .getElementById(
+                            "modalConfirm"
+                        )
+                        .click();
+
+                }
+
+                if (event.key === "Escape") {
+
+                    document
+                        .getElementById(
+                            "modalCancel"
+                        )
+                        .click();
+
+                }
+
+            }
+        );
+
+    }
+
+}
+
+
+function showAlert(message) {
+
+    showModal({
+        title: "Flip 7",
+        message,
+        confirmText: "OK",
+        cancelText: "CLOSE"
+    });
+
+}
+
+
+function showConfirm(
+    title,
+    message,
+    onConfirm
+) {
+
+    showModal({
+        title,
+        message,
+        confirmText: "CONTINUE",
+        cancelText: "CANCEL",
+        onConfirm
+    });
+
+}
+
+
+function showNewPlayerModal() {
+
+    showModal({
+        title: "New Player",
+        message: "Enter the new player's name.",
+        input: true,
+        confirmText: "ADD PLAYER",
+        cancelText: "CANCEL",
+        onConfirm: name => {
+
+            if (!name) {
+                return;
+            }
+
+            addPlayerName(name);
+
+        }
+    });
+
+}
+
+
+function addPlayerName(name) {
+
+    if (game.players.length >= 9) {
+        return;
+    }
+
+    const cleanName =
+        name.trim();
+
+    if (!cleanName) {
+        return;
+    }
+
+    const duplicate =
+        game.players.some(
+            player =>
+                player.name.toLowerCase() ===
+                cleanName.toLowerCase()
+        );
+
+    if (duplicate) {
+
+        showAlert(
+            "That player is already in the game."
+        );
+
+        return;
+    }
+
+    rememberPlayers([
+        cleanName
+    ]);
+
+    game.players.push({
+        name: cleanName,
+        total: 0
+    });
+
+    renderSetup();
+
+}
+
+
+// ============================================================
 // SETUP
 // ============================================================
 
 function showSetup() {
+
     document.getElementById("app").innerHTML = `
+
         <div class="app">
 
             <header>
+
                 <div>
+
                     <h1>Flip 7</h1>
+
                     <div class="sub">
                         Scoring companion
                     </div>
+
                 </div>
+
             </header>
+
 
             <section class="panel">
 
@@ -260,6 +590,7 @@ function showSetup() {
 
             </section>
 
+
             <section
                 class="panel"
                 style="margin-top:16px"
@@ -277,7 +608,9 @@ function showSetup() {
             </section>
 
         </div>
+
     `;
+
 
     document
         .getElementById("newPlayerButton")
@@ -285,15 +618,18 @@ function showSetup() {
             "click",
             addNewPlayer
         );
-        
+
+
     document
-    .getElementById("startBtn")
-    .addEventListener(
-        "click",
-        startGame
-    );
+        .getElementById("startBtn")
+        .addEventListener(
+            "click",
+            startGame
+        );
+
 
     renderSetup();
+
 }
 
 
@@ -302,48 +638,24 @@ function showSetup() {
 // ============================================================
 
 function addNewPlayer() {
+
     if (game.players.length >= 9) {
         return;
     }
 
-    const name = prompt("Enter the new player's name:");
+    showNewPlayerModal();
 
-    if (name === null) {
-        return;
-    }
-
-    const cleanName = name.trim();
-
-    if (!cleanName) {
-        return;
-    }
-
-    const duplicate = game.players.some(
-        player =>
-            player.name.toLowerCase() ===
-            cleanName.toLowerCase()
-    );
-
-    if (duplicate) {
-        alert("That player is already in the game.");
-        return;
-    }
-
-    rememberPlayers([cleanName]);
-
-    game.players.push({
-        name: cleanName,
-        total: 0
-    });
-
-    renderSetup();
 }
 
 
 function selectPlayer(index, value) {
+
     if (value === "__new__") {
+
         addNewPlayer();
+
         renderSetup();
+
         return;
     }
 
@@ -351,16 +663,22 @@ function selectPlayer(index, value) {
         return;
     }
 
-    const duplicate = game.players.some(
-        (player, playerIndex) =>
-            playerIndex !== index &&
-            player.name.toLowerCase() ===
-            value.toLowerCase()
-    );
+    const duplicate =
+        game.players.some(
+            (player, playerIndex) =>
+                playerIndex !== index &&
+                player.name.toLowerCase() ===
+                value.toLowerCase()
+        );
 
     if (duplicate) {
-        alert("That player is already selected.");
+
+        showAlert(
+            "That player is already selected."
+        );
+
         renderSetup();
+
         return;
     }
 
@@ -368,29 +686,47 @@ function selectPlayer(index, value) {
         game.players[index];
 
     if (existingPlayer) {
-        existingPlayer.name = value;
-        existingPlayer.total = 0;
+
+        existingPlayer.name =
+            value;
+
+        existingPlayer.total =
+            0;
+
     } else {
+
         game.players[index] = {
             name: value,
             total: 0
         };
+
     }
 
-    rememberPlayers([value]);
+    rememberPlayers([
+        value
+    ]);
 
     renderSetup();
+
 }
 
 
 function removeSetupPlayer(index) {
-    game.players.splice(index, 1);
+
+    game.players.splice(
+        index,
+        1
+    );
+
     renderSetup();
+
 }
 
 
 function playLastGroup() {
-    const group = getLastGroup();
+
+    const group =
+        getLastGroup();
 
     if (
         group.length < 3 ||
@@ -399,14 +735,18 @@ function playLastGroup() {
         return;
     }
 
-    game.players = group.map(name => ({
-        name,
-        total: 0
-    }));
+    game.players =
+        group.map(
+            name => ({
+                name,
+                total: 0
+            })
+        );
 
     rememberPlayers(group);
 
     startGame();
+
 }
 
 
@@ -415,6 +755,7 @@ function playLastGroup() {
 // ============================================================
 
 function renderSetup() {
+
     const list =
         document.getElementById("playerList");
 
@@ -422,7 +763,9 @@ function renderSetup() {
         document.getElementById("playAgain");
 
     const recentList =
-        document.getElementById("recentPlayersList");
+        document.getElementById(
+            "recentPlayersList"
+        );
 
     const startButton =
         document.getElementById("startBtn");
@@ -446,7 +789,9 @@ function renderSetup() {
         playAgain &&
         lastGroup.length >= 3
     ) {
+
         playAgain.innerHTML = `
+
             <button
                 class="btn primary full"
                 id="playAgainButton"
@@ -462,20 +807,28 @@ function renderSetup() {
                 "
             >
                 ${lastGroup
-                    .map(name => escapeHTML(name))
+                    .map(
+                        name =>
+                            escapeHTML(name)
+                    )
                     .join(" • ")}
             </div>
+
         `;
 
         document
-            .getElementById("playAgainButton")
+            .getElementById(
+                "playAgainButton"
+            )
             .addEventListener(
                 "click",
                 playLastGroup
             );
 
     } else if (playAgain) {
+
         playAgain.innerHTML = "";
+
     }
 
 
@@ -486,38 +839,62 @@ function renderSetup() {
     const slotCount =
         Math.max(
             3,
-            Math.min(9, game.players.length + 1)
+            Math.min(
+                9,
+                game.players.length + 1
+            )
         );
 
     let html = "";
 
-    for (let index = 0; index < slotCount; index++) {
+
+    for (
+        let index = 0;
+        index < slotCount;
+        index++
+    ) {
+
         const player =
             game.players[index];
 
         const selectedName =
-            player ? player.name : "";
+            player
+                ? player.name
+                : "";
+
 
         const options = [
+
             `<option value="">
                 Select previous name
             </option>`,
 
-            ...recentPlayers.map(name => `
-                <option
-                    value="${escapeAttribute(name)}"
-                    ${name === selectedName ? "selected" : ""}
-                >
-                    ${escapeHTML(name)}
-                </option>
-            `),
+            ...recentPlayers.map(
+                name => `
+
+                    <option
+                        value="${escapeAttribute(name)}"
+                        ${
+                            name === selectedName
+                                ? "selected"
+                                : ""
+                        }
+                    >
+                        ${escapeHTML(name)}
+                    </option>
+
+                `
+            ),
 
             `<option value="__new__">
                 + New Player
             </option>`
+
         ].join("");
 
+
         html += `
+
             <div
                 class="player-row"
                 style="
@@ -537,6 +914,7 @@ function renderSetup() {
                     Player ${index + 1}
                 </div>
 
+
                 <select
                     class="input"
                     data-player-select="${index}"
@@ -545,9 +923,11 @@ function renderSetup() {
                     ${options}
                 </select>
 
+
                 ${
                     player
                         ? `
+
                             <button
                                 class="x"
                                 data-remove="${index}"
@@ -555,15 +935,20 @@ function renderSetup() {
                             >
                                 ×
                             </button>
+
                         `
                         : ""
                 }
 
             </div>
+
         `;
+
     }
 
-    list.innerHTML = html;
+
+    list.innerHTML =
+        html;
 
 
     // --------------------------------------------------------
@@ -571,22 +956,29 @@ function renderSetup() {
     // --------------------------------------------------------
 
     list
-        .querySelectorAll("[data-player-select]")
-        .forEach(select => {
+        .querySelectorAll(
+            "[data-player-select]"
+        )
+        .forEach(
+            select => {
 
-            select.addEventListener(
-                "change",
-                () => {
-                    selectPlayer(
-                        Number(
-                            select.dataset.playerSelect
-                        ),
-                        select.value
-                    );
-                }
-            );
+                select.addEventListener(
+                    "change",
+                    () => {
 
-        });
+                        selectPlayer(
+                            Number(
+                                select.dataset
+                                    .playerSelect
+                            ),
+                            select.value
+                        );
+
+                    }
+                );
+
+            }
+        );
 
 
     // --------------------------------------------------------
@@ -594,21 +986,28 @@ function renderSetup() {
     // --------------------------------------------------------
 
     list
-        .querySelectorAll("[data-remove]")
-        .forEach(button => {
+        .querySelectorAll(
+            "[data-remove]"
+        )
+        .forEach(
+            button => {
 
-            button.addEventListener(
-                "click",
-                () => {
-                    removeSetupPlayer(
-                        Number(
-                            button.dataset.remove
-                        )
-                    );
-                }
-            );
+                button.addEventListener(
+                    "click",
+                    () => {
 
-        });
+                        removeSetupPlayer(
+                            Number(
+                                button.dataset
+                                    .remove
+                            )
+                        );
+
+                    }
+                );
+
+            }
+        );
 
 
     // --------------------------------------------------------
@@ -617,7 +1016,9 @@ function renderSetup() {
 
     if (recentList) {
 
-        if (recentPlayers.length === 0) {
+        if (
+            recentPlayers.length === 0
+        ) {
 
             recentList.innerHTML =
                 "No saved players yet.";
@@ -625,6 +1026,7 @@ function renderSetup() {
         } else {
 
             recentList.innerHTML = `
+
                 <div
                     style="
                         display:flex;
@@ -634,56 +1036,68 @@ function renderSetup() {
                 >
 
                     ${recentPlayers
-                        .map(name => `
-                            <div
-                                style="
-                                    display:flex;
-                                    align-items:center;
-                                    justify-content:space-between;
-                                    gap:10px;
-                                "
-                            >
+                        .map(
+                            name => `
 
-                                <span>
-                                    ${escapeHTML(name)}
-                                </span>
-
-                                <button
-                                    class="x"
-                                    data-remove-recent="${escapeAttribute(name)}"
-                                    title="Remove saved player"
+                                <div
+                                    style="
+                                        display:flex;
+                                        align-items:center;
+                                        justify-content:space-between;
+                                        gap:10px;
+                                    "
                                 >
-                                    ×
-                                </button>
 
-                            </div>
-                        `)
+                                    <span>
+                                        ${escapeHTML(name)}
+                                    </span>
+
+                                    <button
+                                        class="x"
+                                        data-remove-recent="${escapeAttribute(name)}"
+                                        title="Remove saved player"
+                                    >
+                                        ×
+                                    </button>
+
+                                </div>
+
+                            `
+                        )
                         .join("")}
 
                 </div>
+
             `;
+
 
             recentList
                 .querySelectorAll(
                     "[data-remove-recent]"
                 )
-                .forEach(button => {
+                .forEach(
+                    button => {
 
-                    button.addEventListener(
-                        "click",
-                        () => {
+                        button.addEventListener(
+                            "click",
+                            () => {
 
-                            const name =
-                                button.dataset.removeRecent;
+                                const name =
+                                    button.dataset
+                                        .removeRecent;
 
-                            removeRecentPlayer(name);
+                                removeRecentPlayer(
+                                    name
+                                );
 
-                        }
-                    );
+                            }
+                        );
 
-                });
+                    }
+                );
 
         }
+
     }
 
 
@@ -692,9 +1106,12 @@ function renderSetup() {
     // --------------------------------------------------------
 
     if (startButton) {
+
         startButton.disabled =
             game.players.length < 3;
+
     }
+
 }
 
 
@@ -704,19 +1121,26 @@ function renderSetup() {
 
 function startGame() {
 
-    if (game.players.length < 3) {
+    if (
+        game.players.length < 3
+    ) {
         return;
     }
 
     game.round = 1;
+
     game.activePlayer = 0;
+
     game.history = [];
+
     game.winner = null;
+
 
     game.entries =
         game.players.map(
             () => emptyEntry()
         );
+
 
     rememberPlayers(
         game.players.map(
@@ -724,9 +1148,11 @@ function startGame() {
         )
     );
 
+
     saveGame();
 
     renderGame();
+
 }
 
 
@@ -735,9 +1161,11 @@ function startGame() {
 // ============================================================
 
 function currentEntry() {
+
     return game.entries[
         game.activePlayer
     ];
+
 }
 
 
@@ -748,16 +1176,23 @@ function currentEntry() {
 function renderGame() {
 
     if (game.winner) {
+
         renderWinner();
+
         return;
+
     }
+
 
     const player =
         game.players[
             game.activePlayer
         ];
 
-    document.getElementById("app").innerHTML = `
+
+    document.getElementById(
+        "app"
+    ).innerHTML = `
 
         <div class="app">
 
@@ -768,12 +1203,16 @@ function renderGame() {
                     <h1>Flip 7</h1>
 
                     <div class="sub">
+
                         Round ${game.round}
+
                         • Nothing is final
                         until you save the round
+
                     </div>
 
                 </div>
+
 
                 <button
                     class="btn secondary"
@@ -802,19 +1241,18 @@ function renderGame() {
 
                     </div>
 
+
                     <strong>
 
                         ${
-                            game.entries.filter(
-                                entry => entry.saved
-                            ).length
+                            getRoundEntryCount()
                         }
 
                         /
 
                         ${game.players.length}
 
-                        ready
+                        entered
 
                     </strong>
 
@@ -843,7 +1281,9 @@ function renderGame() {
                     <div>
 
                         <h2>
-                            ${escapeHTML(player.name)}
+                            ${escapeHTML(
+                                player.name
+                            )}
                         </h2>
 
                         <p>
@@ -852,11 +1292,16 @@ function renderGame() {
 
                     </div>
 
+
                     <strong>
+
                         Player
                         ${game.activePlayer + 1}
+
                         of
+
                         ${game.players.length}
+
                     </strong>
 
                 </div>
@@ -887,6 +1332,7 @@ function renderGame() {
                     ${renderModifier(8)}
                     ${renderModifier(10)}
 
+
                     <button
                         class="
                             mod
@@ -910,41 +1356,23 @@ function renderGame() {
                         ROUND SCORE
                     </div>
 
+
                     <div class="score">
                         ${calculateScore()}
                     </div>
+
 
                     <div class="breakdown">
                         ${getBreakdown()}
                     </div>
 
+
                     <div class="status">
                         ${getStatus()}
                     </div>
 
+
                     <div class="actions">
-
-                        <button
-                            class="btn primary"
-                            id="savePlayer"
-                        >
-
-                            ${
-                                currentEntry().saved
-                                    ? "Update Player"
-                                    : "Save Player"
-                            }
-
-                        </button>
-
-
-                        <button
-                            class="btn secondary"
-                            id="bustButton"
-                        >
-                            Bust
-                        </button>
-
 
                         <button
                             class="btn secondary"
@@ -963,11 +1391,6 @@ function renderGame() {
                     <button
                         class="btn primary"
                         id="saveRound"
-                        ${
-                            allPlayersReady()
-                                ? ""
-                                : "disabled"
-                        }
                     >
                         SAVE ROUND
                     </button>
@@ -1004,10 +1427,10 @@ function renderGame() {
 
     `;
 
+
     connectGameButtons();
+
 }
-
-
 // ============================================================
 // WINNER SCREEN
 // ============================================================
@@ -1015,9 +1438,14 @@ function renderGame() {
 function renderWinner() {
 
     const winner =
-        game.players[game.winner];
+        game.players[
+            game.winner
+        ];
 
-    document.getElementById("app").innerHTML = `
+
+    document.getElementById(
+        "app"
+    ).innerHTML = `
 
         <div class="app">
 
@@ -1038,17 +1466,28 @@ function renderWinner() {
                     🏆
                 </div>
 
+
                 <h1>
-                    ${escapeHTML(winner.name)}
+
+                    ${escapeHTML(
+                        winner.name
+                    )}
+
                     WINS!
+
                 </h1>
 
+
                 <p class="sub">
+
                     Final score:
+
                     <strong>
                         ${winner.total}
                     </strong>
+
                 </p>
+
 
                 <div
                     class="scoreboard"
@@ -1058,6 +1497,7 @@ function renderWinner() {
                     ${renderFinalScores()}
 
                 </div>
+
 
                 <button
                     class="btn primary full"
@@ -1072,6 +1512,7 @@ function renderWinner() {
 
     `;
 
+
     document
         .getElementById("newGame")
         .addEventListener(
@@ -1079,7 +1520,9 @@ function renderWinner() {
             startNewGame
         );
 
+
     launchConfetti();
+
 }
 
 
@@ -1105,11 +1548,18 @@ function renderFinalScores() {
                 >
 
                     <div class="name">
-                        ${escapeHTML(player.name)}
+
+                        ${escapeHTML(
+                            player.name
+                        )}
+
                     </div>
 
+
                     <div class="total">
+
                         ${player.total}
+
                     </div>
 
                 </div>
@@ -1136,56 +1586,92 @@ function launchConfetti() {
         "#ec4899"
     ];
 
-    for (let i = 0; i < 120; i++) {
+
+    for (
+        let i = 0;
+        i < 120;
+        i++
+    ) {
 
         const piece =
             document.createElement("div");
 
-        piece.style.position = "fixed";
+
+        piece.style.position =
+            "fixed";
+
 
         piece.style.left =
-            Math.random() * 100 + "vw";
+            Math.random() * 100 +
+            "vw";
 
-        piece.style.top = "-20px";
+
+        piece.style.top =
+            "-20px";
+
 
         piece.style.width =
-            (Math.random() * 8 + 5) + "px";
+            (Math.random() * 8 + 5) +
+            "px";
+
 
         piece.style.height =
-            (Math.random() * 12 + 6) + "px";
+            (Math.random() * 12 + 6) +
+            "px";
+
 
         piece.style.background =
             colors[
                 Math.floor(
-                    Math.random() * colors.length
+                    Math.random() *
+                    colors.length
                 )
             ];
 
-        piece.style.zIndex = "9999";
-        piece.style.pointerEvents = "none";
+
+        piece.style.zIndex =
+            "9999";
+
+
+        piece.style.pointerEvents =
+            "none";
+
 
         piece.style.transform =
-            `rotate(${Math.random() * 360}deg)`;
+            `rotate(
+                ${Math.random() * 360}deg
+            )`;
 
-        document.body.appendChild(piece);
+
+        document.body.appendChild(
+            piece
+        );
+
 
         const fall =
             piece.animate(
                 [
                     {
                         transform:
-                            `translateY(0) rotate(0deg)`,
+                            `translateY(0)
+                             rotate(0deg)`,
+
                         opacity: 1
                     },
+
                     {
                         transform:
-                            `translateY(110vh) rotate(720deg)`,
+                            `translateY(110vh)
+                             rotate(720deg)`,
+
                         opacity: 0.9
                     }
                 ],
+
                 {
                     duration:
-                        Math.random() * 1800 + 1800,
+                        Math.random() * 1800 +
+                        1800,
 
                     delay:
                         Math.random() * 500,
@@ -1194,6 +1680,7 @@ function launchConfetti() {
                         "cubic-bezier(.2,.7,.3,1)"
                 }
             );
+
 
         fall.onfinish =
             () => piece.remove();
@@ -1218,70 +1705,88 @@ function connectGameButtons() {
 
 
     document
-        .querySelectorAll("[data-player]")
-        .forEach(button => {
+        .querySelectorAll(
+            "[data-player]"
+        )
+        .forEach(
+            button => {
 
-            button.addEventListener(
-                "click",
-                () => {
+                button.addEventListener(
+                    "click",
+                    () => {
 
-                    game.activePlayer =
-                        Number(
-                            button.dataset.player
+                        game.activePlayer =
+                            Number(
+                                button.dataset
+                                    .player
+                            );
+
+
+                        saveGame();
+
+                        renderGame();
+
+                    }
+                );
+
+            }
+        );
+
+
+    document
+        .querySelectorAll(
+            "[data-card]"
+        )
+        .forEach(
+            button => {
+
+                button.addEventListener(
+                    "click",
+                    () => {
+
+                        toggleCard(
+                            Number(
+                                button.dataset
+                                    .card
+                            )
                         );
 
-                    saveGame();
+                    }
+                );
 
-                    renderGame();
-
-                }
-            );
-
-        });
+            }
+        );
 
 
     document
-        .querySelectorAll("[data-card]")
-        .forEach(button => {
+        .querySelectorAll(
+            "[data-modifier]"
+        )
+        .forEach(
+            button => {
 
-            button.addEventListener(
-                "click",
-                () => {
+                button.addEventListener(
+                    "click",
+                    () => {
 
-                    toggleCard(
-                        Number(
-                            button.dataset.card
-                        )
-                    );
+                        toggleModifier(
+                            Number(
+                                button.dataset
+                                    .modifier
+                            )
+                        );
 
-                }
-            );
+                    }
+                );
 
-        });
-
-
-    document
-        .querySelectorAll("[data-modifier]")
-        .forEach(button => {
-
-            button.addEventListener(
-                "click",
-                () => {
-
-                    toggleModifier(
-                        Number(
-                            button.dataset.modifier
-                        )
-                    );
-
-                }
-            );
-
-        });
+            }
+        );
 
 
     document
-        .getElementById("doubleButton")
+        .getElementById(
+            "doubleButton"
+        )
         .addEventListener(
             "click",
             toggleDouble
@@ -1289,23 +1794,9 @@ function connectGameButtons() {
 
 
     document
-        .getElementById("savePlayer")
-        .addEventListener(
-            "click",
-            savePlayerEntry
-        );
-
-
-    document
-        .getElementById("bustButton")
-        .addEventListener(
-            "click",
-            bustPlayer
-        );
-
-
-    document
-        .getElementById("clearPlayer")
+        .getElementById(
+            "clearPlayer"
+        )
         .addEventListener(
             "click",
             clearPlayer
@@ -1313,7 +1804,9 @@ function connectGameButtons() {
 
 
     document
-        .getElementById("saveRound")
+        .getElementById(
+            "saveRound"
+        )
         .addEventListener(
             "click",
             saveRound
@@ -1321,7 +1814,9 @@ function connectGameButtons() {
 
 
     document
-        .getElementById("clearRound")
+        .getElementById(
+            "clearRound"
+        )
         .addEventListener(
             "click",
             clearCurrentRound
@@ -1343,19 +1838,27 @@ function renderScoreboard() {
                 const entry =
                     game.entries[index];
 
+
+                const entered =
+                    hasScoreEntry(
+                        entry
+                    );
+
+
                 return `
 
                     <button
                         class="
                             player-tile
                             ${
-                                index === game.activePlayer
+                                index ===
+                                game.activePlayer
                                     ? "active"
                                     : ""
                             }
 
                             ${
-                                entry.saved
+                                entered
                                     ? "pending"
                                     : ""
                             }
@@ -1364,27 +1867,40 @@ function renderScoreboard() {
                     >
 
                         <div class="name">
-                            ${escapeHTML(player.name)}
+
+                            ${escapeHTML(
+                                player.name
+                            )}
+
                         </div>
+
 
                         <div class="total">
+
                             ${player.total}
+
                         </div>
 
+
                         ${
-                            entry.saved
+                            entered
 
                                 ? `
 
                                     <div
                                         class="pending-score"
                                     >
+
                                         Round:
 
                                         ${
-                                            entry.bust
+                                            isAutomaticBust(
+                                                entry
+                                            )
                                                 ? "BUST"
-                                                : calculateScore(entry)
+                                                : calculateScore(
+                                                    entry
+                                                )
                                         }
 
                                     </div>
@@ -1422,16 +1938,21 @@ function renderNumberCards() {
     const entry =
         currentEntry();
 
+
     return Array
         .from(
-            { length: 12 },
+            { length: 13 },
             (_, index) => {
 
                 const number =
-                    index + 1;
+                    index;
+
 
                 const selected =
-                    entry.cards.includes(number);
+                    entry.cards.includes(
+                        number
+                    );
+
 
                 return `
 
@@ -1446,7 +1967,9 @@ function renderNumberCards() {
                         "
                         data-card="${number}"
                     >
+
                         ${number}
+
                     </button>
 
                 `;
@@ -1469,6 +1992,7 @@ function renderModifier(value) {
             .modifiers
             .includes(value);
 
+
     return `
 
         <button
@@ -1482,7 +2006,9 @@ function renderModifier(value) {
             "
             data-modifier="${value}"
         >
+
             +${value}
+
         </button>
 
     `;
@@ -1499,14 +2025,21 @@ function toggleCard(number) {
     const entry =
         currentEntry();
 
-    entry.bust = false;
-    entry.saved = false;
 
-    if (entry.cards.includes(number)) {
+    // Selecting any card means
+    // this player is not an automatic bust.
+
+    entry.bust = false;
+
+
+    if (
+        entry.cards.includes(number)
+    ) {
 
         entry.cards =
             entry.cards.filter(
-                card => card !== number
+                card =>
+                    card !== number
             );
 
     } else {
@@ -1515,7 +2048,9 @@ function toggleCard(number) {
 
     }
 
+
     saveGame();
+
     renderGame();
 
 }
@@ -1530,8 +2065,9 @@ function toggleModifier(value) {
     const entry =
         currentEntry();
 
+
     entry.bust = false;
-    entry.saved = false;
+
 
     if (
         entry.modifiers.includes(value)
@@ -1539,16 +2075,21 @@ function toggleModifier(value) {
 
         entry.modifiers =
             entry.modifiers.filter(
-                modifier => modifier !== value
+                modifier =>
+                    modifier !== value
             );
 
     } else {
 
-        entry.modifiers.push(value);
+        entry.modifiers.push(
+            value
+        );
 
     }
 
+
     saveGame();
+
     renderGame();
 
 }
@@ -1563,14 +2104,64 @@ function toggleDouble() {
     const entry =
         currentEntry();
 
+
     entry.bust = false;
-    entry.saved = false;
+
 
     entry.double =
         !entry.double;
 
+
     saveGame();
+
     renderGame();
+
+}
+
+
+// ============================================================
+// SCORE ENTRY CHECKS
+// ============================================================
+
+function hasScoreEntry(entry) {
+
+    if (!entry) {
+        return false;
+    }
+
+
+    return (
+        entry.cards.length > 0 ||
+        entry.modifiers.length > 0 ||
+        entry.double === true ||
+        entry.bust === true
+    );
+
+}
+
+
+function isAutomaticBust(entry) {
+
+    if (!entry) {
+        return true;
+    }
+
+
+    return (
+        entry.cards.length === 0 &&
+        entry.modifiers.length === 0 &&
+        entry.double === false
+    );
+
+}
+
+
+function getRoundEntryCount() {
+
+    return game.entries.filter(
+        entry =>
+            hasScoreEntry(entry)
+    ).length;
 
 }
 
@@ -1583,9 +2174,18 @@ function calculateScore(
     entry = currentEntry()
 ) {
 
-    if (entry.bust) {
+    // No selections means
+    // automatic bust.
+
+    if (
+        isAutomaticBust(entry) ||
+        entry.bust
+    ) {
+
         return 0;
+
     }
+
 
     const base =
         entry.cards.reduce(
@@ -1594,6 +2194,7 @@ function calculateScore(
             0
         );
 
+
     const modifiers =
         entry.modifiers.reduce(
             (total, modifier) =>
@@ -1601,15 +2202,18 @@ function calculateScore(
             0
         );
 
+
     const multiplier =
         entry.double
             ? 2
             : 1;
 
+
     const flipSeven =
         entry.cards.length === 7
             ? 15
             : 0;
+
 
     return (
         base * multiplier
@@ -1629,9 +2233,16 @@ function getBreakdown() {
     const entry =
         currentEntry();
 
-    if (entry.bust) {
-        return "Bust = 0 points";
+
+    if (
+        isAutomaticBust(entry) ||
+        entry.bust
+    ) {
+
+        return "No score entered — Bust = 0 points";
+
     }
+
 
     const base =
         entry.cards.reduce(
@@ -1640,27 +2251,40 @@ function getBreakdown() {
             0
         );
 
+
     let text =
         `Cards: ${base}`;
 
+
     if (entry.double) {
+
         text += " × 2";
+
     }
 
-    if (entry.modifiers.length) {
+
+    if (
+        entry.modifiers.length
+    ) {
 
         text +=
             " + " +
-            entry.modifiers.join(" + ");
+            entry.modifiers.join(
+                " + "
+            );
 
     }
 
-    if (entry.cards.length === 7) {
+
+    if (
+        entry.cards.length === 7
+    ) {
 
         text +=
             " + 15 Flip 7";
 
     }
+
 
     return text;
 
@@ -1676,17 +2300,24 @@ function getStatus() {
     const entry =
         currentEntry();
 
-    if (entry.bust) {
+
+    if (
+        isAutomaticBust(entry) ||
+        entry.bust
+    ) {
 
         return `
             <span class="bad">
-                BUST — 0 points
+                No score entered — BUST = 0
             </span>
         `;
 
     }
 
-    if (entry.cards.length === 7) {
+
+    if (
+        entry.cards.length === 7
+    ) {
 
         return `
             <span class="good">
@@ -1696,58 +2327,33 @@ function getStatus() {
 
     }
 
-    if (entry.cards.length === 0) {
 
-        return "No cards entered yet.";
+    if (
+        entry.cards.length === 0
+    ) {
+
+        return `
+            <span class="good">
+                0 point score entered
+            </span>
+        `;
 
     }
 
+
     return `
+
         ${entry.cards.length}
-        card${entry.cards.length === 1
-            ? ""
-            : "s"}
+
+        card${
+            entry.cards.length === 1
+                ? ""
+                : "s"
+        }
+
         entered.
+
     `;
-
-}
-
-
-// ============================================================
-// SAVE PLAYER
-// ============================================================
-
-function savePlayerEntry() {
-
-    const entry =
-        currentEntry();
-
-    entry.bust = false;
-    entry.saved = true;
-
-    saveGame();
-    renderGame();
-
-}
-
-
-// ============================================================
-// BUST
-// ============================================================
-
-function bustPlayer() {
-
-    const entry =
-        currentEntry();
-
-    entry.cards = [];
-    entry.modifiers = [];
-    entry.double = false;
-    entry.bust = true;
-    entry.saved = true;
-
-    saveGame();
-    renderGame();
 
 }
 
@@ -1762,14 +2368,16 @@ function clearPlayer() {
         game.activePlayer
     ] = emptyEntry();
 
+
     saveGame();
+
     renderGame();
 
 }
 
 
 // ============================================================
-// READY CHECK
+// ROUND CHECKS
 // ============================================================
 
 function allPlayersReady() {
@@ -1780,32 +2388,31 @@ function allPlayersReady() {
     )
     &&
     game.entries.every(
-        entry => entry.saved
+        entry =>
+            hasScoreEntry(entry)
     );
 
 }
 
-
-// ============================================================
-// PENDING CHECK
-// ============================================================
 
 function hasPendingEntries() {
 
     return game.entries.some(
-        entry => entry.saved
+        entry =>
+            hasScoreEntry(entry)
     );
 
 }
-
-
 // ============================================================
 // SAVE ROUND
 // ============================================================
 
 function saveRound() {
 
-    if (!allPlayersReady()) {
+    // SAVE ROUND is allowed even when a player
+    // has selected nothing. No selection = BUST.
+
+    if (game.players.length < 3) {
         return;
     }
 
@@ -1816,16 +2423,32 @@ function saveRound() {
     game.players.forEach(
         (player, index) => {
 
+            const entry =
+                game.entries[index];
+
+
+            // No selection means
+            // automatic bust.
+
+            if (
+                isAutomaticBust(entry)
+            ) {
+
+                entry.bust = true;
+
+            }
+
+
             player.total +=
-                calculateScore(
-                    game.entries[index]
-                );
+                calculateScore(entry);
 
         }
     );
 
 
-    // Save round history.
+    // --------------------------------------------------------
+    // SAVE ROUND HISTORY
+    // --------------------------------------------------------
 
     game.history.push({
 
@@ -1836,12 +2459,14 @@ function saveRound() {
                 (entry, index) => ({
 
                     name:
-                        game.players[index].name,
+                        game.players[index]
+                            .name,
 
                     score:
                         calculateScore(entry),
 
                     bust:
+                        isAutomaticBust(entry) ||
                         entry.bust
 
                 })
@@ -1850,16 +2475,19 @@ function saveRound() {
     });
 
 
-    // ========================================================
+    // --------------------------------------------------------
     // CHECK FOR WINNER
-    // ========================================================
+    // --------------------------------------------------------
 
     const playersOver200 =
         game.players
             .map(
                 (player, index) => ({
+
                     index: index,
+
                     total: player.total
+
                 })
             )
             .filter(
@@ -1868,7 +2496,9 @@ function saveRound() {
             );
 
 
-    if (playersOver200.length > 0) {
+    if (
+        playersOver200.length > 0
+    ) {
 
         // Highest score wins.
 
@@ -1877,19 +2507,24 @@ function saveRound() {
                 b.total - a.total
         );
 
+
         game.winner =
             playersOver200[0].index;
 
-        // This is now a completed game,
-        // so remember this group for PLAY IT AGAIN.
+
+        // Remember the completed
+        // player group for PLAY IT AGAIN.
 
         saveLastGroup();
 
+
         rememberPlayers(
             game.players.map(
-                player => player.name
+                player =>
+                    player.name
             )
         );
+
 
         saveGame();
 
@@ -1900,20 +2535,24 @@ function saveRound() {
     }
 
 
-    // ========================================================
+    // --------------------------------------------------------
     // NO WINNER YET
-    // ========================================================
+    // --------------------------------------------------------
 
     game.round++;
+
 
     game.entries =
         game.players.map(
             () => emptyEntry()
         );
 
+
     game.activePlayer = 0;
 
+
     saveGame();
+
     renderGame();
 
 }
@@ -1925,18 +2564,26 @@ function saveRound() {
 
 function clearCurrentRound() {
 
-    if (!hasPendingEntries()) {
+    if (
+        !hasPendingEntries()
+    ) {
+
         return;
+
     }
+
 
     game.entries =
         game.players.map(
             () => emptyEntry()
         );
 
+
     game.activePlayer = 0;
 
+
     saveGame();
+
     renderGame();
 
 }
@@ -1948,27 +2595,33 @@ function clearCurrentRound() {
 
 function startNewGame() {
 
-    const confirmed =
-        confirm(
-            "Start a new game? Your current game will be erased."
-        );
+    showConfirm(
+        "Start a New Game?",
+        "Your current game will be erased.",
+        () => {
 
-    if (!confirmed) {
-        return;
-    }
+            localStorage.removeItem(
+                STORAGE_KEY
+            );
 
-    localStorage.removeItem(
-        STORAGE_KEY
+
+            game.players = [];
+
+            game.round = 1;
+
+            game.activePlayer = 0;
+
+            game.entries = [];
+
+            game.history = [];
+
+            game.winner = null;
+
+
+            showSetup();
+
+        }
     );
-
-    game.players = [];
-    game.round = 1;
-    game.activePlayer = 0;
-    game.entries = [];
-    game.history = [];
-    game.winner = null;
-
-    showSetup();
 
 }
 
@@ -1993,6 +2646,7 @@ function renderHistory() {
 
     }
 
+
     return game.history
         .slice()
         .reverse()
@@ -2009,6 +2663,7 @@ function renderHistory() {
                         Round ${round.round}
                     </strong>
 
+
                     ${
                         round.scores
                             .map(
@@ -2021,26 +2676,34 @@ function renderHistory() {
                                     >
 
                                         <span>
+
                                             ${escapeHTML(
                                                 result.name
                                             )}
+
                                         </span>
 
+
                                         <span>
+
                                             ${
                                                 result.bust
                                                     ? "BUST"
                                                     : "Round score"
                                             }
+
                                         </span>
 
+
                                         <span>
+
                                             ${
                                                 result.bust
                                                     ? "0"
                                                     : "+" +
                                                       result.score
                                             }
+
                                         </span>
 
                                     </div>
@@ -2079,7 +2742,10 @@ function escapeHTML(text) {
 
             };
 
-            return entities[character];
+
+            return entities[
+                character
+            ];
 
         }
     );
@@ -2088,7 +2754,9 @@ function escapeHTML(text) {
 
 
 function escapeAttribute(text) {
+
     return escapeHTML(text);
+
 }
 
 
