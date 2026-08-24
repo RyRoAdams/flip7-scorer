@@ -1,9 +1,12 @@
 // ============================================================
 // FLIP 7 SCORER
 // Persistent game + winner detection
+// Recent players + Play It Again
 // ============================================================
 
 const STORAGE_KEY = "flip7-scorer-game-v1";
+const RECENT_PLAYERS_KEY = "flip7-scorer-recent-players-v1";
+const LAST_GROUP_KEY = "flip7-scorer-last-group-v1";
 
 const game = {
     players: [],
@@ -13,6 +16,123 @@ const game = {
     history: [],
     winner: null
 };
+
+
+// ============================================================
+// RECENT PLAYER STORAGE
+// ============================================================
+
+function getRecentPlayers() {
+    try {
+        const saved = localStorage.getItem(RECENT_PLAYERS_KEY);
+
+        if (!saved) {
+            return [];
+        }
+
+        const players = JSON.parse(saved);
+
+        if (!Array.isArray(players)) {
+            return [];
+        }
+
+        return players
+            .filter(name => typeof name === "string" && name.trim())
+            .map(name => name.trim())
+            .filter(
+                (name, index, array) =>
+                    array.findIndex(
+                        item => item.toLowerCase() === name.toLowerCase()
+                    ) === index
+            );
+    } catch (error) {
+        console.error("Could not load recent players:", error);
+        return [];
+    }
+}
+
+
+function saveRecentPlayers(players) {
+    const unique = [];
+
+    players.forEach(name => {
+        const cleanName = String(name).trim();
+
+        if (
+            cleanName &&
+            !unique.some(
+                existing =>
+                    existing.toLowerCase() === cleanName.toLowerCase()
+            )
+        ) {
+            unique.push(cleanName);
+        }
+    });
+
+    localStorage.setItem(
+        RECENT_PLAYERS_KEY,
+        JSON.stringify(unique)
+    );
+}
+
+
+function rememberPlayers(names) {
+    const existing = getRecentPlayers();
+
+    const combined = [
+        ...names,
+        ...existing
+    ];
+
+    saveRecentPlayers(combined);
+}
+
+
+function removeRecentPlayer(name) {
+    const remaining = getRecentPlayers().filter(
+        player =>
+            player.toLowerCase() !== name.toLowerCase()
+    );
+
+    saveRecentPlayers(remaining);
+
+    renderSetup();
+}
+
+
+function getLastGroup() {
+    try {
+        const saved = localStorage.getItem(LAST_GROUP_KEY);
+
+        if (!saved) {
+            return [];
+        }
+
+        const group = JSON.parse(saved);
+
+        if (!Array.isArray(group)) {
+            return [];
+        }
+
+        return group
+            .filter(name => typeof name === "string")
+            .map(name => name.trim())
+            .filter(Boolean);
+    } catch (error) {
+        console.error("Could not load last group:", error);
+        return [];
+    }
+}
+
+
+function saveLastGroup() {
+    const names = game.players.map(player => player.name);
+
+    localStorage.setItem(
+        LAST_GROUP_KEY,
+        JSON.stringify(names)
+    );
+}
 
 
 // ============================================================
@@ -81,142 +201,212 @@ function emptyEntry() {
 // ============================================================
 
 function showSetup() {
-
     document.getElementById("app").innerHTML = `
-
         <div class="app">
 
             <header>
-
                 <div>
-
                     <h1>Flip 7</h1>
-
                     <div class="sub">
                         Scoring companion
                     </div>
-
                 </div>
-
             </header>
-
 
             <section class="panel">
 
                 <h2>Who's playing?</h2>
 
                 <p class="sub">
-                    Add 3–9 players.
+                    Select previous players or add someone new.
                 </p>
 
-
                 <div
-                    class="row"
-                    style="margin-top:14px"
-                >
-
-                    <input
-                        id="nameInput"
-                        class="input"
-                        placeholder="Player name"
-                        autocomplete="off"
-                    >
-
-
-                    <button
-                        class="btn primary"
-                        id="addBtn"
-                    >
-                        Add Player
-                    </button>
-
-                </div>
-
+                    id="playAgain"
+                    style="margin-top:16px"
+                ></div>
 
                 <div
                     id="playerList"
                     class="player-list"
+                    style="margin-top:16px"
                 ></div>
 
+                <div
+                    style="
+                        margin-top:18px;
+                        padding-top:16px;
+                        border-top:1px solid rgba(128,128,128,.2);
+                    "
+                >
+
+                    <button
+                        class="btn secondary full"
+                        id="newPlayerButton"
+                    >
+                        + New Player
+                    </button>
+
+                </div>
 
                 <button
                     class="btn primary full"
                     id="startBtn"
                     disabled
+                    style="margin-top:16px"
                 >
                     Start Game
                 </button>
 
             </section>
 
-        </div>
+            <section
+                class="panel"
+                style="margin-top:16px"
+            >
 
+                <h3 style="margin-top:0">
+                    Recent Players
+                </h3>
+
+                <div
+                    id="recentPlayersList"
+                    class="sub"
+                ></div>
+
+            </section>
+
+        </div>
     `;
 
-
     document
-        .getElementById("addBtn")
-        .addEventListener("click", addPlayer);
-
-
-    document
-        .getElementById("nameInput")
-        .addEventListener(
-            "keydown",
-            event => {
-
-                if (event.key === "Enter") {
-                    addPlayer();
-                }
-
-            }
-        );
-
-
-    document
-        .getElementById("startBtn")
+        .getElementById("newPlayerButton")
         .addEventListener(
             "click",
-            startGame
+            addNewPlayer
         );
-
+        
+    document
+    .getElementById("startBtn")
+    .addEventListener(
+        "click",
+        startGame
+    );
 
     renderSetup();
 }
 
 
 // ============================================================
-// ADD PLAYER
+// SETUP PLAYER MANAGEMENT
 // ============================================================
 
-function addPlayer() {
-
-    const input =
-        document.getElementById("nameInput");
-
-    const name =
-        input.value.trim();
-
-
-    if (!name) {
-        return;
-    }
-
-
+function addNewPlayer() {
     if (game.players.length >= 9) {
         return;
     }
 
+    const name = prompt("Enter the new player's name:");
+
+    if (name === null) {
+        return;
+    }
+
+    const cleanName = name.trim();
+
+    if (!cleanName) {
+        return;
+    }
+
+    const duplicate = game.players.some(
+        player =>
+            player.name.toLowerCase() ===
+            cleanName.toLowerCase()
+    );
+
+    if (duplicate) {
+        alert("That player is already in the game.");
+        return;
+    }
+
+    rememberPlayers([cleanName]);
 
     game.players.push({
-        name: name,
+        name: cleanName,
         total: 0
     });
 
+    renderSetup();
+}
 
-    input.value = "";
+
+function selectPlayer(index, value) {
+    if (value === "__new__") {
+        addNewPlayer();
+        renderSetup();
+        return;
+    }
+
+    if (!value) {
+        return;
+    }
+
+    const duplicate = game.players.some(
+        (player, playerIndex) =>
+            playerIndex !== index &&
+            player.name.toLowerCase() ===
+            value.toLowerCase()
+    );
+
+    if (duplicate) {
+        alert("That player is already selected.");
+        renderSetup();
+        return;
+    }
+
+    const existingPlayer =
+        game.players[index];
+
+    if (existingPlayer) {
+        existingPlayer.name = value;
+        existingPlayer.total = 0;
+    } else {
+        game.players[index] = {
+            name: value,
+            total: 0
+        };
+    }
+
+    rememberPlayers([value]);
 
     renderSetup();
+}
+
+
+function removeSetupPlayer(index) {
+    game.players.splice(index, 1);
+    renderSetup();
+}
+
+
+function playLastGroup() {
+    const group = getLastGroup();
+
+    if (
+        group.length < 3 ||
+        group.length > 9
+    ) {
+        return;
+    }
+
+    game.players = group.map(name => ({
+        name,
+        total: 0
+    }));
+
+    rememberPlayers(group);
+
+    startGame();
 }
 
 
@@ -225,40 +415,183 @@ function addPlayer() {
 // ============================================================
 
 function renderSetup() {
-
     const list =
         document.getElementById("playerList");
+
+    const playAgain =
+        document.getElementById("playAgain");
+
+    const recentList =
+        document.getElementById("recentPlayersList");
+
+    const startButton =
+        document.getElementById("startBtn");
 
     if (!list) {
         return;
     }
 
+    const recentPlayers =
+        getRecentPlayers();
 
-    list.innerHTML =
-        game.players
-            .map(
-                (player, index) => `
+    const lastGroup =
+        getLastGroup();
 
-                    <div class="player-row">
 
-                        <span>
-                            ${index + 1}.
-                            ${escapeHTML(player.name)}
-                        </span>
+    // --------------------------------------------------------
+    // PLAY IT AGAIN
+    // --------------------------------------------------------
 
-                        <button
-                            class="x"
-                            data-remove="${index}"
-                        >
-                            ×
-                        </button>
+    if (
+        playAgain &&
+        lastGroup.length >= 3
+    ) {
+        playAgain.innerHTML = `
+            <button
+                class="btn primary full"
+                id="playAgainButton"
+            >
+                PLAY IT AGAIN
+            </button>
 
-                    </div>
+            <div
+                class="sub"
+                style="
+                    text-align:center;
+                    margin-top:8px;
+                "
+            >
+                ${lastGroup
+                    .map(name => escapeHTML(name))
+                    .join(" • ")}
+            </div>
+        `;
 
-                `
-            )
-            .join("");
+        document
+            .getElementById("playAgainButton")
+            .addEventListener(
+                "click",
+                playLastGroup
+            );
 
+    } else if (playAgain) {
+        playAgain.innerHTML = "";
+    }
+
+
+    // --------------------------------------------------------
+    // PLAYER DROPDOWNS
+    // --------------------------------------------------------
+
+    const slotCount =
+        Math.max(
+            3,
+            Math.min(9, game.players.length + 1)
+        );
+
+    let html = "";
+
+    for (let index = 0; index < slotCount; index++) {
+        const player =
+            game.players[index];
+
+        const selectedName =
+            player ? player.name : "";
+
+        const options = [
+            `<option value="">
+                Select previous name
+            </option>`,
+
+            ...recentPlayers.map(name => `
+                <option
+                    value="${escapeAttribute(name)}"
+                    ${name === selectedName ? "selected" : ""}
+                >
+                    ${escapeHTML(name)}
+                </option>
+            `),
+
+            `<option value="__new__">
+                + New Player
+            </option>`
+        ].join("");
+
+        html += `
+            <div
+                class="player-row"
+                style="
+                    display:flex;
+                    align-items:center;
+                    gap:8px;
+                    margin-bottom:10px;
+                "
+            >
+
+                <div
+                    style="
+                        min-width:70px;
+                        font-weight:600;
+                    "
+                >
+                    Player ${index + 1}
+                </div>
+
+                <select
+                    class="input"
+                    data-player-select="${index}"
+                    style="flex:1"
+                >
+                    ${options}
+                </select>
+
+                ${
+                    player
+                        ? `
+                            <button
+                                class="x"
+                                data-remove="${index}"
+                                title="Remove player"
+                            >
+                                ×
+                            </button>
+                        `
+                        : ""
+                }
+
+            </div>
+        `;
+    }
+
+    list.innerHTML = html;
+
+
+    // --------------------------------------------------------
+    // PLAYER SELECT EVENTS
+    // --------------------------------------------------------
+
+    list
+        .querySelectorAll("[data-player-select]")
+        .forEach(select => {
+
+            select.addEventListener(
+                "change",
+                () => {
+                    selectPlayer(
+                        Number(
+                            select.dataset.playerSelect
+                        ),
+                        select.value
+                    );
+                }
+            );
+
+        });
+
+
+    // --------------------------------------------------------
+    // REMOVE PLAYER EVENTS
+    // --------------------------------------------------------
 
     list
         .querySelectorAll("[data-remove]")
@@ -267,24 +600,101 @@ function renderSetup() {
             button.addEventListener(
                 "click",
                 () => {
-
-                    game.players.splice(
-                        Number(button.dataset.remove),
-                        1
+                    removeSetupPlayer(
+                        Number(
+                            button.dataset.remove
+                        )
                     );
-
-                    renderSetup();
-
                 }
             );
 
         });
 
 
-    document
-        .getElementById("startBtn")
-        .disabled =
+    // --------------------------------------------------------
+    // RECENT PLAYER MANAGEMENT
+    // --------------------------------------------------------
+
+    if (recentList) {
+
+        if (recentPlayers.length === 0) {
+
+            recentList.innerHTML =
+                "No saved players yet.";
+
+        } else {
+
+            recentList.innerHTML = `
+                <div
+                    style="
+                        display:flex;
+                        flex-direction:column;
+                        gap:8px;
+                    "
+                >
+
+                    ${recentPlayers
+                        .map(name => `
+                            <div
+                                style="
+                                    display:flex;
+                                    align-items:center;
+                                    justify-content:space-between;
+                                    gap:10px;
+                                "
+                            >
+
+                                <span>
+                                    ${escapeHTML(name)}
+                                </span>
+
+                                <button
+                                    class="x"
+                                    data-remove-recent="${escapeAttribute(name)}"
+                                    title="Remove saved player"
+                                >
+                                    ×
+                                </button>
+
+                            </div>
+                        `)
+                        .join("")}
+
+                </div>
+            `;
+
+            recentList
+                .querySelectorAll(
+                    "[data-remove-recent]"
+                )
+                .forEach(button => {
+
+                    button.addEventListener(
+                        "click",
+                        () => {
+
+                            const name =
+                                button.dataset.removeRecent;
+
+                            removeRecentPlayer(name);
+
+                        }
+                    );
+
+                });
+
+        }
+    }
+
+
+    // --------------------------------------------------------
+    // START GAME BUTTON
+    // --------------------------------------------------------
+
+    if (startButton) {
+        startButton.disabled =
             game.players.length < 3;
+    }
 }
 
 
@@ -298,16 +708,21 @@ function startGame() {
         return;
     }
 
-
     game.round = 1;
     game.activePlayer = 0;
     game.history = [];
     game.winner = null;
 
-
     game.entries =
-        game.players.map(() => emptyEntry());
+        game.players.map(
+            () => emptyEntry()
+        );
 
+    rememberPlayers(
+        game.players.map(
+            player => player.name
+        )
+    );
 
     saveGame();
 
@@ -320,11 +735,9 @@ function startGame() {
 // ============================================================
 
 function currentEntry() {
-
     return game.entries[
         game.activePlayer
     ];
-
 }
 
 
@@ -339,12 +752,10 @@ function renderGame() {
         return;
     }
 
-
     const player =
         game.players[
             game.activePlayer
         ];
-
 
     document.getElementById("app").innerHTML = `
 
@@ -357,16 +768,12 @@ function renderGame() {
                     <h1>Flip 7</h1>
 
                     <div class="sub">
-
                         Round ${game.round}
-
                         • Nothing is final
                         until you save the round
-
                     </div>
 
                 </div>
-
 
                 <button
                     class="btn secondary"
@@ -394,7 +801,6 @@ function renderGame() {
                         </p>
 
                     </div>
-
 
                     <strong>
 
@@ -446,14 +852,11 @@ function renderGame() {
 
                     </div>
 
-
                     <strong>
-
                         Player
                         ${game.activePlayer + 1}
                         of
                         ${game.players.length}
-
                     </strong>
 
                 </div>
@@ -484,7 +887,6 @@ function renderGame() {
                     ${renderModifier(8)}
                     ${renderModifier(10)}
 
-
                     <button
                         class="
                             mod
@@ -508,21 +910,17 @@ function renderGame() {
                         ROUND SCORE
                     </div>
 
-
                     <div class="score">
                         ${calculateScore()}
                     </div>
-
 
                     <div class="breakdown">
                         ${getBreakdown()}
                     </div>
 
-
                     <div class="status">
                         ${getStatus()}
                     </div>
-
 
                     <div class="actions">
 
@@ -606,7 +1004,6 @@ function renderGame() {
 
     `;
 
-
     connectGameButtons();
 }
 
@@ -619,7 +1016,6 @@ function renderWinner() {
 
     const winner =
         game.players[game.winner];
-
 
     document.getElementById("app").innerHTML = `
 
@@ -642,12 +1038,10 @@ function renderWinner() {
                     🏆
                 </div>
 
-
                 <h1>
                     ${escapeHTML(winner.name)}
                     WINS!
                 </h1>
-
 
                 <p class="sub">
                     Final score:
@@ -655,7 +1049,6 @@ function renderWinner() {
                         ${winner.total}
                     </strong>
                 </p>
-
 
                 <div
                     class="scoreboard"
@@ -665,7 +1058,6 @@ function renderWinner() {
                     ${renderFinalScores()}
 
                 </div>
-
 
                 <button
                     class="btn primary full"
@@ -680,14 +1072,12 @@ function renderWinner() {
 
     `;
 
-
     document
         .getElementById("newGame")
         .addEventListener(
             "click",
             startNewGame
         );
-
 
     launchConfetti();
 }
@@ -704,7 +1094,8 @@ function renderFinalScores() {
             (player, index) => `
 
                 <div
-                    class="player-tile
+                    class="
+                        player-tile
                         ${
                             index === game.winner
                                 ? "active"
@@ -745,14 +1136,13 @@ function launchConfetti() {
         "#ec4899"
     ];
 
-
     for (let i = 0; i < 120; i++) {
 
         const piece =
             document.createElement("div");
 
-
         piece.style.position = "fixed";
+
         piece.style.left =
             Math.random() * 100 + "vw";
 
@@ -777,9 +1167,7 @@ function launchConfetti() {
         piece.style.transform =
             `rotate(${Math.random() * 360}deg)`;
 
-
         document.body.appendChild(piece);
-
 
         const fall =
             piece.animate(
@@ -789,7 +1177,6 @@ function launchConfetti() {
                             `translateY(0) rotate(0deg)`,
                         opacity: 1
                     },
-
                     {
                         transform:
                             `translateY(110vh) rotate(720deg)`,
@@ -807,7 +1194,6 @@ function launchConfetti() {
                         "cubic-bezier(.2,.7,.3,1)"
                 }
             );
-
 
         fall.onfinish =
             () => piece.remove();
@@ -957,7 +1343,6 @@ function renderScoreboard() {
                 const entry =
                     game.entries[index];
 
-
                 return `
 
                     <button
@@ -979,18 +1364,12 @@ function renderScoreboard() {
                     >
 
                         <div class="name">
-
                             ${escapeHTML(player.name)}
-
                         </div>
-
 
                         <div class="total">
-
                             ${player.total}
-
                         </div>
-
 
                         ${
                             entry.saved
@@ -998,11 +1377,8 @@ function renderScoreboard() {
                                 ? `
 
                                     <div
-                                        class="
-                                            pending-score
-                                        "
+                                        class="pending-score"
                                     >
-
                                         Round:
 
                                         ${
@@ -1046,7 +1422,6 @@ function renderNumberCards() {
     const entry =
         currentEntry();
 
-
     return Array
         .from(
             { length: 12 },
@@ -1055,10 +1430,8 @@ function renderNumberCards() {
                 const number =
                     index + 1;
 
-
                 const selected =
                     entry.cards.includes(number);
-
 
                 return `
 
@@ -1073,9 +1446,7 @@ function renderNumberCards() {
                         "
                         data-card="${number}"
                     >
-
                         ${number}
-
                     </button>
 
                 `;
@@ -1098,7 +1469,6 @@ function renderModifier(value) {
             .modifiers
             .includes(value);
 
-
     return `
 
         <button
@@ -1112,9 +1482,7 @@ function renderModifier(value) {
             "
             data-modifier="${value}"
         >
-
             +${value}
-
         </button>
 
     `;
@@ -1131,10 +1499,8 @@ function toggleCard(number) {
     const entry =
         currentEntry();
 
-
     entry.bust = false;
     entry.saved = false;
-
 
     if (entry.cards.includes(number)) {
 
@@ -1149,9 +1515,7 @@ function toggleCard(number) {
 
     }
 
-
     saveGame();
-
     renderGame();
 
 }
@@ -1166,10 +1530,8 @@ function toggleModifier(value) {
     const entry =
         currentEntry();
 
-
     entry.bust = false;
     entry.saved = false;
-
 
     if (
         entry.modifiers.includes(value)
@@ -1186,9 +1548,7 @@ function toggleModifier(value) {
 
     }
 
-
     saveGame();
-
     renderGame();
 
 }
@@ -1203,17 +1563,13 @@ function toggleDouble() {
     const entry =
         currentEntry();
 
-
     entry.bust = false;
     entry.saved = false;
-
 
     entry.double =
         !entry.double;
 
-
     saveGame();
-
     renderGame();
 
 }
@@ -1231,14 +1587,12 @@ function calculateScore(
         return 0;
     }
 
-
     const base =
         entry.cards.reduce(
             (total, card) =>
                 total + card,
             0
         );
-
 
     const modifiers =
         entry.modifiers.reduce(
@@ -1247,18 +1601,15 @@ function calculateScore(
             0
         );
 
-
     const multiplier =
         entry.double
             ? 2
             : 1;
 
-
     const flipSeven =
         entry.cards.length === 7
             ? 15
             : 0;
-
 
     return (
         base * multiplier
@@ -1278,11 +1629,9 @@ function getBreakdown() {
     const entry =
         currentEntry();
 
-
     if (entry.bust) {
         return "Bust = 0 points";
     }
-
 
     const base =
         entry.cards.reduce(
@@ -1291,15 +1640,12 @@ function getBreakdown() {
             0
         );
 
-
     let text =
         `Cards: ${base}`;
-
 
     if (entry.double) {
         text += " × 2";
     }
-
 
     if (entry.modifiers.length) {
 
@@ -1309,14 +1655,12 @@ function getBreakdown() {
 
     }
 
-
     if (entry.cards.length === 7) {
 
         text +=
             " + 15 Flip 7";
 
     }
-
 
     return text;
 
@@ -1332,7 +1676,6 @@ function getStatus() {
     const entry =
         currentEntry();
 
-
     if (entry.bust) {
 
         return `
@@ -1342,7 +1685,6 @@ function getStatus() {
         `;
 
     }
-
 
     if (entry.cards.length === 7) {
 
@@ -1354,24 +1696,18 @@ function getStatus() {
 
     }
 
-
     if (entry.cards.length === 0) {
 
         return "No cards entered yet.";
 
     }
 
-
     return `
-
         ${entry.cards.length}
-
         card${entry.cards.length === 1
             ? ""
             : "s"}
-
         entered.
-
     `;
 
 }
@@ -1386,13 +1722,10 @@ function savePlayerEntry() {
     const entry =
         currentEntry();
 
-
     entry.bust = false;
     entry.saved = true;
 
-
     saveGame();
-
     renderGame();
 
 }
@@ -1407,20 +1740,13 @@ function bustPlayer() {
     const entry =
         currentEntry();
 
-
     entry.cards = [];
-
     entry.modifiers = [];
-
     entry.double = false;
-
     entry.bust = true;
-
     entry.saved = true;
 
-
     saveGame();
-
     renderGame();
 
 }
@@ -1436,9 +1762,7 @@ function clearPlayer() {
         game.activePlayer
     ] = emptyEntry();
 
-
     saveGame();
-
     renderGame();
 
 }
@@ -1553,10 +1877,19 @@ function saveRound() {
                 b.total - a.total
         );
 
-
         game.winner =
             playersOver200[0].index;
 
+        // This is now a completed game,
+        // so remember this group for PLAY IT AGAIN.
+
+        saveLastGroup();
+
+        rememberPlayers(
+            game.players.map(
+                player => player.name
+            )
+        );
 
         saveGame();
 
@@ -1578,12 +1911,9 @@ function saveRound() {
             () => emptyEntry()
         );
 
-
     game.activePlayer = 0;
 
-
     saveGame();
-
     renderGame();
 
 }
@@ -1599,18 +1929,14 @@ function clearCurrentRound() {
         return;
     }
 
-
     game.entries =
         game.players.map(
             () => emptyEntry()
         );
 
-
     game.activePlayer = 0;
 
-
     saveGame();
-
     renderGame();
 
 }
@@ -1627,16 +1953,13 @@ function startNewGame() {
             "Start a new game? Your current game will be erased."
         );
 
-
     if (!confirmed) {
         return;
     }
 
-
     localStorage.removeItem(
         STORAGE_KEY
     );
-
 
     game.players = [];
     game.round = 1;
@@ -1644,7 +1967,6 @@ function startNewGame() {
     game.entries = [];
     game.history = [];
     game.winner = null;
-
 
     showSetup();
 
@@ -1671,7 +1993,6 @@ function renderHistory() {
 
     }
 
-
     return game.history
         .slice()
         .reverse()
@@ -1687,7 +2008,6 @@ function renderHistory() {
                     <strong>
                         Round ${round.round}
                     </strong>
-
 
                     ${
                         round.scores
@@ -1706,7 +2026,6 @@ function renderHistory() {
                                             )}
                                         </span>
 
-
                                         <span>
                                             ${
                                                 result.bust
@@ -1714,7 +2033,6 @@ function renderHistory() {
                                                     : "Round score"
                                             }
                                         </span>
-
 
                                         <span>
                                             ${
@@ -1761,12 +2079,16 @@ function escapeHTML(text) {
 
             };
 
-
             return entities[character];
 
         }
     );
 
+}
+
+
+function escapeAttribute(text) {
+    return escapeHTML(text);
 }
 
 
