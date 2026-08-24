@@ -1,0 +1,10 @@
+{
+  "name": "Flip 7 Scorer",
+  "short_name": "Flip 7",
+  "description": "A simple Flip 7 scoring app.",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#f4f6fa",
+  "theme_color": "#5b5ce2",
+  "orientation": "portrait"
+}

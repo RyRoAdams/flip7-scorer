@@ -12,6 +12,7 @@
 
     <title>Flip 7 Scorer</title>
 
+    <link rel="manifest" href="manifest.json">
     <!-- Connects our design file -->
     <link
         rel="stylesheet"
@@ -30,6 +31,12 @@
     <!-- Connects our game logic -->
     <script src="app.js"></script>
 
+    <script>
+    if ("serviceWorker" in navigator) {
+        navigator.serviceWorker.register("service-worker.js");
+    }
+    </script>
+    
 </body>
 
 </html>
