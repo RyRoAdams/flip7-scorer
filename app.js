@@ -1,28 +1,64 @@
 // ============================================================
 // FLIP 7 SCORER
-// Game Logic
+// Persistent game + winner detection
 // ============================================================
 
-
-// ============================================================
-// GAME STATE
-// ============================================================
+const STORAGE_KEY = "flip7-scorer-game-v1";
 
 const game = {
-
     players: [],
-
     round: 1,
-
     activePlayer: 0,
-
-    // Each player has an entry for the current round.
-    // These scores are NOT permanent until SAVE ROUND.
     entries: [],
-
-    history: []
-
+    history: [],
+    winner: null
 };
+
+
+// ============================================================
+// SAVE / LOAD GAME
+// ============================================================
+
+function saveGame() {
+    localStorage.setItem(
+        STORAGE_KEY,
+        JSON.stringify(game)
+    );
+}
+
+
+function loadGame() {
+    const saved = localStorage.getItem(STORAGE_KEY);
+
+    if (!saved) {
+        return false;
+    }
+
+    try {
+        const loaded = JSON.parse(saved);
+
+        if (
+            !loaded ||
+            !Array.isArray(loaded.players) ||
+            !Array.isArray(loaded.entries)
+        ) {
+            return false;
+        }
+
+        game.players = loaded.players;
+        game.round = loaded.round || 1;
+        game.activePlayer = loaded.activePlayer || 0;
+        game.entries = loaded.entries;
+        game.history = loaded.history || [];
+        game.winner = loaded.winner || null;
+
+        return game.players.length >= 3;
+
+    } catch (error) {
+        console.error("Could not load saved game:", error);
+        return false;
+    }
+}
 
 
 // ============================================================
@@ -30,26 +66,18 @@ const game = {
 // ============================================================
 
 function emptyEntry() {
-
     return {
-
         cards: [],
-
         modifiers: [],
-
         double: false,
-
         bust: false,
-
         saved: false
-
     };
-
 }
 
 
 // ============================================================
-// PLAYER SETUP
+// SETUP
 // ============================================================
 
 function showSetup() {
@@ -128,22 +156,17 @@ function showSetup() {
 
     document
         .getElementById("addBtn")
-        .addEventListener(
-            "click",
-            addPlayer
-        );
+        .addEventListener("click", addPlayer);
 
 
     document
         .getElementById("nameInput")
         .addEventListener(
             "keydown",
-            function(event) {
+            event => {
 
                 if (event.key === "Enter") {
-
                     addPlayer();
-
                 }
 
             }
@@ -159,7 +182,6 @@ function showSetup() {
 
 
     renderSetup();
-
 }
 
 
@@ -172,39 +194,29 @@ function addPlayer() {
     const input =
         document.getElementById("nameInput");
 
-
     const name =
         input.value.trim();
 
 
     if (!name) {
-
         return;
-
     }
 
 
     if (game.players.length >= 9) {
-
         return;
-
     }
 
 
     game.players.push({
-
         name: name,
-
         total: 0
-
     });
 
 
     input.value = "";
 
-
     renderSetup();
-
 }
 
 
@@ -217,76 +229,62 @@ function renderSetup() {
     const list =
         document.getElementById("playerList");
 
-
     if (!list) {
-
         return;
-
     }
 
 
     list.innerHTML =
         game.players
             .map(
-                function(player, index) {
+                (player, index) => `
 
-                    return `
+                    <div class="player-row">
 
-                        <div class="player-row">
+                        <span>
+                            ${index + 1}.
+                            ${escapeHTML(player.name)}
+                        </span>
 
-                            <span>
+                        <button
+                            class="x"
+                            data-remove="${index}"
+                        >
+                            ×
+                        </button>
 
-                                ${index + 1}.
-                                ${escapeHTML(player.name)}
+                    </div>
 
-                            </span>
-
-
-                            <button
-                                class="x"
-                                data-remove="${index}"
-                            >
-                                ×
-                            </button>
-
-                        </div>
-
-                    `;
-
-                }
+                `
             )
             .join("");
 
 
     list
         .querySelectorAll("[data-remove]")
-        .forEach(
-            function(button) {
+        .forEach(button => {
 
-                button.addEventListener(
-                    "click",
-                    function() {
+            button.addEventListener(
+                "click",
+                () => {
 
-                        game.players.splice(
-                            Number(button.dataset.remove),
-                            1
-                        );
+                    game.players.splice(
+                        Number(button.dataset.remove),
+                        1
+                    );
 
+                    renderSetup();
 
-                        renderSetup();
+                }
+            );
 
-                    }
-                );
-
-            }
-        );
+        });
 
 
     document
         .getElementById("startBtn")
         .disabled =
             game.players.length < 3;
-
 }
 
 
@@ -297,32 +295,28 @@ function renderSetup() {
 function startGame() {
 
     if (game.players.length < 3) {
-
         return;
-
     }
 
 
-    // Create a blank round entry
-    // for every player.
+    game.round = 1;
+    game.activePlayer = 0;
+    game.history = [];
+    game.winner = null;
+
 
     game.entries =
-        game.players.map(
-            function() {
+        game.players.map(() => emptyEntry());
 
-                return emptyEntry();
 
-            }
-        );
-
+    saveGame();
 
     renderGame();
-
 }
 
 
 // ============================================================
-// CURRENT PLAYER ENTRY
+// CURRENT ENTRY
 // ============================================================
 
 function currentEntry() {
@@ -340,6 +334,12 @@ function currentEntry() {
 
 function renderGame() {
 
+    if (game.winner) {
+        renderWinner();
+        return;
+    }
+
+
     const player =
         game.players[
             game.activePlayer
@@ -349,9 +349,6 @@ function renderGame() {
     document.getElementById("app").innerHTML = `
 
         <div class="app">
-
-
-            <!-- HEADER -->
 
             <header>
 
@@ -381,8 +378,6 @@ function renderGame() {
             </header>
 
 
-            <!-- SCOREBOARD -->
-
             <section class="panel">
 
                 <div class="turn">
@@ -405,13 +400,8 @@ function renderGame() {
 
                         ${
                             game.entries.filter(
-                                function(entry) {
-
-                                    return entry.saved;
-
-                                }
+                                entry => entry.saved
                             ).length
-
                         }
 
                         /
@@ -437,8 +427,6 @@ function renderGame() {
             </section>
 
 
-            <!-- PLAYER ENTRY -->
-
             <section
                 class="panel"
                 style="margin-top:16px"
@@ -449,11 +437,7 @@ function renderGame() {
                     <div>
 
                         <h2>
-
-                            ${escapeHTML(
-                                player.name
-                            )}
-
+                            ${escapeHTML(player.name)}
                         </h2>
 
                         <p>
@@ -475,8 +459,6 @@ function renderGame() {
                 </div>
 
 
-                <!-- NUMBER CARDS -->
-
                 <h3>
                     Number Cards
                 </h3>
@@ -489,8 +471,6 @@ function renderGame() {
                 </div>
 
 
-                <!-- SPECIAL CARDS -->
-
                 <h3>
                     Special Cards
                 </h3>
@@ -499,13 +479,9 @@ function renderGame() {
                 <div class="mod-grid">
 
                     ${renderModifier(2)}
-
                     ${renderModifier(4)}
-
                     ${renderModifier(6)}
-
                     ${renderModifier(8)}
-
                     ${renderModifier(10)}
 
 
@@ -520,43 +496,31 @@ function renderGame() {
                         "
                         id="doubleButton"
                     >
-
                         ×2
-
                     </button>
 
                 </div>
 
 
-                <!-- SCORE PREVIEW -->
-
                 <div class="preview">
 
                     <div class="preview-label">
-
                         ROUND SCORE
-
                     </div>
 
 
                     <div class="score">
-
                         ${calculateScore()}
-
                     </div>
 
 
                     <div class="breakdown">
-
                         ${getBreakdown()}
-
                     </div>
 
 
                     <div class="status">
-
                         ${getStatus()}
-
                     </div>
 
 
@@ -580,9 +544,7 @@ function renderGame() {
                             class="btn secondary"
                             id="bustButton"
                         >
-
                             Bust
-
                         </button>
 
 
@@ -590,17 +552,13 @@ function renderGame() {
                             class="btn secondary"
                             id="clearPlayer"
                         >
-
                             Clear Player
-
                         </button>
 
                     </div>
 
                 </div>
 
-
-                <!-- ROUND CONTROLS -->
 
                 <div class="round-actions">
 
@@ -613,9 +571,7 @@ function renderGame() {
                                 : "disabled"
                         }
                     >
-
                         SAVE ROUND
-
                     </button>
 
 
@@ -628,9 +584,7 @@ function renderGame() {
                                 : "disabled"
                         }
                     >
-
                         CLEAR CURRENT ROUND
-
                     </button>
 
                 </div>
@@ -638,21 +592,15 @@ function renderGame() {
             </section>
 
 
-            <!-- HISTORY -->
-
-            <section
-                class="panel history"
-            >
+            <section class="panel history">
 
                 <h2>
                     Round History
                 </h2>
 
-
                 ${renderHistory()}
 
             </section>
-
 
         </div>
 
@@ -660,12 +608,217 @@ function renderGame() {
 
 
     connectGameButtons();
+}
+
+
+// ============================================================
+// WINNER SCREEN
+// ============================================================
+
+function renderWinner() {
+
+    const winner =
+        game.players[game.winner];
+
+
+    document.getElementById("app").innerHTML = `
+
+        <div class="app">
+
+            <section
+                class="panel"
+                style="
+                    text-align:center;
+                    padding:40px 20px;
+                "
+            >
+
+                <div
+                    style="
+                        font-size:64px;
+                        margin-bottom:10px;
+                    "
+                >
+                    🏆
+                </div>
+
+
+                <h1>
+                    ${escapeHTML(winner.name)}
+                    WINS!
+                </h1>
+
+
+                <p class="sub">
+                    Final score:
+                    <strong>
+                        ${winner.total}
+                    </strong>
+                </p>
+
+
+                <div
+                    class="scoreboard"
+                    style="margin-top:25px"
+                >
+
+                    ${renderFinalScores()}
+
+                </div>
+
+
+                <button
+                    class="btn primary full"
+                    id="newGame"
+                >
+                    NEW GAME
+                </button>
+
+            </section>
+
+        </div>
+
+    `;
+
+
+    document
+        .getElementById("newGame")
+        .addEventListener(
+            "click",
+            startNewGame
+        );
+
+
+    launchConfetti();
+}
+
+
+// ============================================================
+// FINAL SCORES
+// ============================================================
+
+function renderFinalScores() {
+
+    return game.players
+        .map(
+            (player, index) => `
+
+                <div
+                    class="player-tile
+                        ${
+                            index === game.winner
+                                ? "active"
+                                : ""
+                        }
+                    "
+                >
+
+                    <div class="name">
+                        ${escapeHTML(player.name)}
+                    </div>
+
+                    <div class="total">
+                        ${player.total}
+                    </div>
+
+                </div>
+
+            `
+        )
+        .join("");
 
 }
 
 
 // ============================================================
-// CONNECT GAME BUTTONS
+// CONFETTI
+// ============================================================
+
+function launchConfetti() {
+
+    const colors = [
+        "#5b5ce2",
+        "#059669",
+        "#f59e0b",
+        "#dc3545",
+        "#0ea5e9",
+        "#ec4899"
+    ];
+
+
+    for (let i = 0; i < 120; i++) {
+
+        const piece =
+            document.createElement("div");
+
+
+        piece.style.position = "fixed";
+        piece.style.left =
+            Math.random() * 100 + "vw";
+
+        piece.style.top = "-20px";
+
+        piece.style.width =
+            (Math.random() * 8 + 5) + "px";
+
+        piece.style.height =
+            (Math.random() * 12 + 6) + "px";
+
+        piece.style.background =
+            colors[
+                Math.floor(
+                    Math.random() * colors.length
+                )
+            ];
+
+        piece.style.zIndex = "9999";
+        piece.style.pointerEvents = "none";
+
+        piece.style.transform =
+            `rotate(${Math.random() * 360}deg)`;
+
+
+        document.body.appendChild(piece);
+
+
+        const fall =
+            piece.animate(
+                [
+                    {
+                        transform:
+                            `translateY(0) rotate(0deg)`,
+                        opacity: 1
+                    },
+
+                    {
+                        transform:
+                            `translateY(110vh) rotate(720deg)`,
+                        opacity: 0.9
+                    }
+                ],
+                {
+                    duration:
+                        Math.random() * 1800 + 1800,
+
+                    delay:
+                        Math.random() * 500,
+
+                    easing:
+                        "cubic-bezier(.2,.7,.3,1)"
+                }
+            );
+
+
+        fall.onfinish =
+            () => piece.remove();
+
+    }
+
+}
+
+
+// ============================================================
+// CONNECT BUTTONS
 // ============================================================
 
 function connectGameButtons() {
@@ -674,80 +827,71 @@ function connectGameButtons() {
         .getElementById("newGame")
         .addEventListener(
             "click",
-            function() {
-
-                location.reload();
-
-            }
+            startNewGame
         );
 
 
     document
         .querySelectorAll("[data-player]")
-        .forEach(
-            function(button) {
+        .forEach(button => {
 
-                button.addEventListener(
-                    "click",
-                    function() {
+            button.addEventListener(
+                "click",
+                () => {
 
-                        game.activePlayer =
-                            Number(
-                                button.dataset.player
-                            );
+                    game.activePlayer =
+                        Number(
+                            button.dataset.player
+                        );
 
+                    saveGame();
 
-                        renderGame();
+                    renderGame();
 
-                    }
-                );
+                }
+            );
 
-            }
-        );
+        });
 
 
     document
         .querySelectorAll("[data-card]")
-        .forEach(
-            function(button) {
+        .forEach(button => {
 
-                button.addEventListener(
-                    "click",
-                    function() {
+            button.addEventListener(
+                "click",
+                () => {
 
-                        toggleCard(
-                            Number(
-                                button.dataset.card
-                            )
-                        );
+                    toggleCard(
+                        Number(
+                            button.dataset.card
+                        )
+                    );
 
-                    }
-                );
+                }
+            );
 
-            }
-        );
+        });
 
 
     document
         .querySelectorAll("[data-modifier]")
-        .forEach(
-            function(button) {
+        .forEach(button => {
 
-                button.addEventListener(
-                    "click",
-                    function() {
+            button.addEventListener(
+                "click",
+                () => {
 
-                        toggleModifier(
-                            Number(
-                                button.dataset.modifier
-                            )
-                        );
+                    toggleModifier(
+                        Number(
+                            button.dataset.modifier
+                        )
+                    );
 
-                    }
-                );
+                }
+            );
 
-            }
-        );
+        });
 
 
     document
@@ -808,7 +952,7 @@ function renderScoreboard() {
 
     return game.players
         .map(
-            function(player, index) {
+            (player, index) => {
 
                 const entry =
                     game.entries[index];
@@ -820,8 +964,7 @@ function renderScoreboard() {
                         class="
                             player-tile
                             ${
-                                index ===
-                                game.activePlayer
+                                index === game.activePlayer
                                     ? "active"
                                     : ""
                             }
@@ -832,15 +975,12 @@ function renderScoreboard() {
                                     : ""
                             }
                         "
-
                         data-player="${index}"
                     >
 
                         <div class="name">
 
-                            ${escapeHTML(
-                                player.name
-                            )}
+                            ${escapeHTML(player.name)}
 
                         </div>
 
@@ -868,9 +1008,7 @@ function renderScoreboard() {
                                         ${
                                             entry.bust
                                                 ? "BUST"
-                                                : calculateScore(
-                                                    entry
-                                                )
+                                                : calculateScore(entry)
                                         }
 
                                     </div>
@@ -880,13 +1018,9 @@ function renderScoreboard() {
                                 : `
 
                                     <div
-                                        class="
-                                            tile-label
-                                        "
+                                        class="tile-label"
                                     >
-
                                         Not entered
-
                                     </div>
 
                                 `
@@ -916,16 +1050,14 @@ function renderNumberCards() {
     return Array
         .from(
             { length: 12 },
-            function(_, index) {
+            (_, index) => {
 
                 const number =
                     index + 1;
 
 
                 const selected =
-                    entry.cards.includes(
-                        number
-                    );
+                    entry.cards.includes(number);
 
 
                 return `
@@ -939,7 +1071,6 @@ function renderNumberCards() {
                                     : ""
                             }
                         "
-
                         data-card="${number}"
                     >
 
@@ -957,7 +1088,7 @@ function renderNumberCards() {
 
 
 // ============================================================
-// MODIFIER BUTTON
+// MODIFIER
 // ============================================================
 
 function renderModifier(value) {
@@ -979,7 +1110,6 @@ function renderModifier(value) {
                         : ""
                 }
             "
-
             data-modifier="${value}"
         >
 
@@ -993,7 +1123,7 @@ function renderModifier(value) {
 
 
 // ============================================================
-// SELECT NUMBER CARD
+// CARD TOGGLE
 // ============================================================
 
 function toggleCard(number) {
@@ -1003,21 +1133,14 @@ function toggleCard(number) {
 
 
     entry.bust = false;
-
     entry.saved = false;
 
 
-    if (
-        entry.cards.includes(number)
-    ) {
+    if (entry.cards.includes(number)) {
 
         entry.cards =
             entry.cards.filter(
-                function(card) {
-
-                    return card !== number;
-
-                }
+                card => card !== number
             );
 
     } else {
@@ -1027,13 +1150,15 @@ function toggleCard(number) {
     }
 
 
+    saveGame();
+
     renderGame();
 
 }
 
 
 // ============================================================
-// SELECT MODIFIER
+// MODIFIER TOGGLE
 // ============================================================
 
 function toggleModifier(value) {
@@ -1043,7 +1168,6 @@ function toggleModifier(value) {
 
 
     entry.bust = false;
-
     entry.saved = false;
 
 
@@ -1053,11 +1177,7 @@ function toggleModifier(value) {
 
         entry.modifiers =
             entry.modifiers.filter(
-                function(modifier) {
-
-                    return modifier !== value;
-
-                }
+                modifier => modifier !== value
             );
 
     } else {
@@ -1067,13 +1187,15 @@ function toggleModifier(value) {
     }
 
 
+    saveGame();
+
     renderGame();
 
 }
 
 
 // ============================================================
-// ×2
+// DOUBLE
 // ============================================================
 
 function toggleDouble() {
@@ -1083,7 +1205,6 @@ function toggleDouble() {
 
 
     entry.bust = false;
-
     entry.saved = false;
 
 
@@ -1091,42 +1212,38 @@ function toggleDouble() {
         !entry.double;
 
 
+    saveGame();
+
     renderGame();
 
 }
 
 
 // ============================================================
-// CALCULATE SCORE
+// SCORE
 // ============================================================
 
-function calculateScore(entry = currentEntry()) {
+function calculateScore(
+    entry = currentEntry()
+) {
 
     if (entry.bust) {
-
         return 0;
-
     }
 
 
     const base =
         entry.cards.reduce(
-            function(total, card) {
-
-                return total + card;
-
-            },
+            (total, card) =>
+                total + card,
             0
         );
 
 
     const modifiers =
         entry.modifiers.reduce(
-            function(total, modifier) {
-
-                return total + modifier;
-
-            },
+            (total, modifier) =>
+                total + modifier,
             0
         );
 
@@ -1153,7 +1270,7 @@ function calculateScore(entry = currentEntry()) {
 
 
 // ============================================================
-// SCORE BREAKDOWN
+// BREAKDOWN
 // ============================================================
 
 function getBreakdown() {
@@ -1163,19 +1280,14 @@ function getBreakdown() {
 
 
     if (entry.bust) {
-
         return "Bust = 0 points";
-
     }
 
 
     const base =
         entry.cards.reduce(
-            function(total, card) {
-
-                return total + card;
-
-            },
+            (total, card) =>
+                total + card,
             0
         );
 
@@ -1185,9 +1297,7 @@ function getBreakdown() {
 
 
     if (entry.double) {
-
         text += " × 2";
-
     }
 
 
@@ -1200,9 +1310,7 @@ function getBreakdown() {
     }
 
 
-    if (
-        entry.cards.length === 7
-    ) {
+    if (entry.cards.length === 7) {
 
         text +=
             " + 15 Flip 7";
@@ -1229,33 +1337,25 @@ function getStatus() {
 
         return `
             <span class="bad">
-
                 BUST — 0 points
-
             </span>
         `;
 
     }
 
 
-    if (
-        entry.cards.length === 7
-    ) {
+    if (entry.cards.length === 7) {
 
         return `
             <span class="good">
-
                 FLIP 7 — +15 bonus
-
             </span>
         `;
 
     }
 
 
-    if (
-        entry.cards.length === 0
-    ) {
+    if (entry.cards.length === 0) {
 
         return "No cards entered yet.";
 
@@ -1278,7 +1378,7 @@ function getStatus() {
 
 
 // ============================================================
-// SAVE INDIVIDUAL PLAYER ENTRY
+// SAVE PLAYER
 // ============================================================
 
 function savePlayerEntry() {
@@ -1288,9 +1388,10 @@ function savePlayerEntry() {
 
 
     entry.bust = false;
-
     entry.saved = true;
 
+
+    saveGame();
 
     renderGame();
 
@@ -1318,13 +1419,15 @@ function bustPlayer() {
     entry.saved = true;
 
 
+    saveGame();
+
     renderGame();
 
 }
 
 
 // ============================================================
-// CLEAR ONE PLAYER
+// CLEAR PLAYER
 // ============================================================
 
 function clearPlayer() {
@@ -1334,68 +1437,60 @@ function clearPlayer() {
     ] = emptyEntry();
 
 
+    saveGame();
+
     renderGame();
 
 }
 
 
 // ============================================================
-// ARE ALL PLAYERS READY?
+// READY CHECK
 // ============================================================
 
 function allPlayersReady() {
 
-    return game.entries.length ===
+    return (
+        game.entries.length ===
         game.players.length
-
-        &&
-
-        game.entries.every(
-            function(entry) {
-
-                return entry.saved;
-
-            }
-        );
-
-}
-
-
-// ============================================================
-// DOES CURRENT ROUND HAVE ANY ENTRIES?
-// ============================================================
-
-function hasPendingEntries() {
-
-    return game.entries.some(
-        function(entry) {
-
-            return entry.saved;
-
-        }
+    )
+    &&
+    game.entries.every(
+        entry => entry.saved
     );
 
 }
 
 
 // ============================================================
-// SAVE ENTIRE ROUND
+// PENDING CHECK
+// ============================================================
+
+function hasPendingEntries() {
+
+    return game.entries.some(
+        entry => entry.saved
+    );
+
+}
+
+
+// ============================================================
+// SAVE ROUND
 // ============================================================
 
 function saveRound() {
 
     if (!allPlayersReady()) {
-
         return;
-
     }
 
 
-    // Permanently add this round
-    // to every player's total.
+    // Add this round's score
+    // to every player's permanent total.
 
     game.players.forEach(
-        function(player, index) {
+        (player, index) => {
 
             player.total +=
                 calculateScore(
@@ -1406,8 +1501,7 @@ function saveRound() {
     );
 
 
-    // Save a permanent copy
-    // of this round's results.
+    // Save round history.
 
     game.history.push({
 
@@ -1415,46 +1509,80 @@ function saveRound() {
 
         scores:
             game.entries.map(
-                function(entry, index) {
+                (entry, index) => ({
 
-                    return {
+                    name:
+                        game.players[index].name,
 
-                        name:
-                            game.players[index]
-                                .name,
+                    score:
+                        calculateScore(entry),
 
-                        score:
-                            calculateScore(
-                                entry
-                            ),
+                    bust:
+                        entry.bust
 
-                        bust:
-                            entry.bust
-
-                    };
-
-                }
+                })
             )
 
     });
 
 
-    // Start a brand-new round.
+    // ========================================================
+    // CHECK FOR WINNER
+    // ========================================================
+
+    const playersOver200 =
+        game.players
+            .map(
+                (player, index) => ({
+                    index: index,
+                    total: player.total
+                })
+            )
+            .filter(
+                player =>
+                    player.total >= 200
+            );
+
+
+    if (playersOver200.length > 0) {
+
+        // Highest score wins.
+
+        playersOver200.sort(
+            (a, b) =>
+                b.total - a.total
+        );
+
+
+        game.winner =
+            playersOver200[0].index;
+
+
+        saveGame();
+
+        renderWinner();
+
+        return;
+
+    }
+
+
+    // ========================================================
+    // NO WINNER YET
+    // ========================================================
 
     game.round++;
 
     game.entries =
         game.players.map(
-            function() {
-
-                return emptyEntry();
-
-            }
+            () => emptyEntry()
         );
 
 
     game.activePlayer = 0;
 
+
+    saveGame();
 
     renderGame();
 
@@ -1468,34 +1596,57 @@ function saveRound() {
 function clearCurrentRound() {
 
     if (!hasPendingEntries()) {
-
         return;
-
     }
 
 
-    // IMPORTANT:
-    //
-    // We have NOT added these scores
-    // to permanent totals yet.
-    //
-    // Therefore clearing the round
-    // simply throws away the entries.
-
     game.entries =
         game.players.map(
-            function() {
-
-                return emptyEntry();
-
-            }
+            () => emptyEntry()
         );
 
 
     game.activePlayer = 0;
 
 
+    saveGame();
+
     renderGame();
+
+}
+
+
+// ============================================================
+// NEW GAME
+// ============================================================
+
+function startNewGame() {
+
+    const confirmed =
+        confirm(
+            "Start a new game? Your current game will be erased."
+        );
+
+
+    if (!confirmed) {
+        return;
+    }
+
+
+    localStorage.removeItem(
+        STORAGE_KEY
+    );
+
+
+    game.players = [];
+    game.round = 1;
+    game.activePlayer = 0;
+    game.entries = [];
+    game.history = [];
+    game.winner = null;
+
+
+    showSetup();
 
 }
 
@@ -1513,9 +1664,7 @@ function renderHistory() {
         return `
 
             <div class="empty">
-
                 No completed rounds yet.
-
             </div>
 
         `;
@@ -1527,82 +1676,65 @@ function renderHistory() {
         .slice()
         .reverse()
         .map(
-            function(round) {
+            round => `
 
-                return `
+                <div
+                    style="
+                        margin-bottom:12px
+                    "
+                >
 
-                    <div
-                        style="
-                            margin-bottom:12px
-                        "
-                    >
-
-                        <strong>
-
-                            Round
-                            ${round.round}
-
-                        </strong>
+                    <strong>
+                        Round ${round.round}
+                    </strong>
 
 
-                        ${
-                            round.scores
-                                .map(
-                                    function(result) {
+                    ${
+                        round.scores
+                            .map(
+                                result => `
 
-                                        return `
+                                    <div
+                                        class="
+                                            history-row
+                                        "
+                                    >
 
-                                            <div
-                                                class="
-                                                    history-row
-                                                "
-                                            >
-
-                                                <span>
-
-                                                    ${escapeHTML(
-                                                        result.name
-                                                    )}
-
-                                                </span>
+                                        <span>
+                                            ${escapeHTML(
+                                                result.name
+                                            )}
+                                        </span>
 
 
-                                                <span>
-
-                                                    ${
-                                                        result.bust
-                                                            ? "BUST"
-                                                            : "Round score"
-                                                    }
-
-                                                </span>
+                                        <span>
+                                            ${
+                                                result.bust
+                                                    ? "BUST"
+                                                    : "Round score"
+                                            }
+                                        </span>
 
 
-                                                <span>
+                                        <span>
+                                            ${
+                                                result.bust
+                                                    ? "0"
+                                                    : "+" +
+                                                      result.score
+                                            }
+                                        </span>
 
-                                                    ${
-                                                        result.bust
-                                                            ? "0"
-                                                            : "+" +
-                                                              result.score
-                                                    }
+                                    </div>
 
-                                                </span>
+                                `
+                            )
+                            .join("")
+                    }
 
-                                            </div>
+                </div>
 
-                                        `;
-
-                                    }
-                                )
-                                .join("")
-                        }
-
-                    </div>
-
-                `;
-
-            }
+            `
         )
         .join("");
 
@@ -1610,25 +1742,21 @@ function renderHistory() {
 
 
 // ============================================================
-// BASIC HTML SAFETY
+// ESCAPE HTML
 // ============================================================
 
 function escapeHTML(text) {
 
     return String(text).replace(
         /[&<>"']/g,
-        function(character) {
+        character => {
 
             const entities = {
 
                 "&": "&amp;",
-
                 "<": "&lt;",
-
                 ">": "&gt;",
-
                 '"': "&quot;",
-
                 "'": "&#039;"
 
             };
@@ -1643,7 +1771,23 @@ function escapeHTML(text) {
 
 
 // ============================================================
-// START APPLICATION
+// APP STARTUP
 // ============================================================
 
-showSetup();
+if (loadGame()) {
+
+    if (game.winner) {
+
+        renderWinner();
+
+    } else {
+
+        renderGame();
+
+    }
+
+} else {
+
+    showSetup();
+
+}
