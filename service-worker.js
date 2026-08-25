@@ -1,13 +1,14 @@
-const CACHE_NAME = "flip7-scorer-v6";
+const CACHE_NAME = "flip7-scorer-v7";
 
 const FILES_TO_CACHE = [
     "./",
     "./index.html",
     "./style.css",
     "./app.js",
-    "./manifest.json"
+    "./manifest.json",
+    "./icon-192.png",
+    "./icon-512.png"
 ];
-
 self.addEventListener("install", event => {
 
     event.waitUntil(
